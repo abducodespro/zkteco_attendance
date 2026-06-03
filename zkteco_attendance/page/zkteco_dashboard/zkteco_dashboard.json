@@ -1,0 +1,19 @@
+{
+ "creation": "2024-01-01 00:00:00.000000",
+ "doctype": "Page",
+ "icon": "fa fa-dashboard",
+ "modified": "2024-01-01 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ZKTeco Attendance",
+ "name": "zkteco-dashboard",
+ "owner": "Administrator",
+ "page_name": "zkteco-dashboard",
+ "restrict_to_domain": "",
+ "roles": [
+  {"role": "System Manager"},
+  {"role": "HR Manager"},
+  {"role": "Attendance Manager"}
+ ],
+ "standard": "Yes",
+ "title": "ZKTeco Attendance Dashboard"
+}
