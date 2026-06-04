@@ -9,12 +9,17 @@ app_version = "1.0.0"
 # Required Apps
 required_apps = ["erpnext"]
 
-# Includes in <head>
-# ------------------
-app_include_css = "/assets/zkteco_attendance/css/zkteco_attendance.css"
-app_include_js = "/assets/zkteco_attendance/js/zkteco_attendance.js"
+# -----------------------------------------------------------------
+# Asset Includes
+# app_include_css / app_include_js require a proper esbuild bundle
+# entry-point declared in package.json. We skip the global JS
+# include entirely — the dashboard page JS is loaded by the Page
+# framework automatically, and doctype_js handles form JS.
+# -----------------------------------------------------------------
 
-# DocType JS
+# DocType JS — loaded only when that DocType form is opened.
+# Frappe serves these files directly from the app's public/ folder;
+# they do NOT go through esbuild, so no package.json entry needed.
 doctype_js = {
     "Biometric Device": "public/js/biometric_device.js",
 }
@@ -63,12 +68,6 @@ has_permission = {
     "Attendance Sync Log": "zkteco_attendance.zkteco_attendance.doctype.attendance_sync_log.attendance_sync_log.has_permission",
     "Device Employee Mapping": "zkteco_attendance.zkteco_attendance.doctype.device_employee_mapping.device_employee_mapping.has_permission",
 }
-
-# Override DocType Classes
-# -------------------------
-# override_doctype_class = {
-#     "Employee Checkin": "zkteco_attendance.overrides.EmployeeCheckin"
-# }
 
 # Document Events
 # ---------------
