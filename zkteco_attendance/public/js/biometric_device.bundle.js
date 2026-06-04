@@ -52,7 +52,7 @@ function test_connection(frm) {
 	frappe.dom.freeze(__("Testing connection to {0}…", [frm.doc.device_name]));
 
 	frappe.call({
-		method: "zkteco_attendance.zkteco_attendance.doctype.biometric_device.biometric_device.test_connection",
+		method: "zkteco_attendance.doctype.biometric_device.biometric_device.test_connection",
 		args: { device_name: frm.doc.name },
 		always: () => frappe.dom.unfreeze(),
 		callback: (r) => {
@@ -89,7 +89,7 @@ function sync_now(frm) {
 		]),
 		() => {
 			frappe.call({
-				method: "zkteco_attendance.zkteco_attendance.doctype.biometric_device.biometric_device.sync_device",
+				method: "zkteco_attendance.doctype.biometric_device.biometric_device.sync_device",
 				args: {
 					device_name: frm.doc.name,
 					triggered_by: "Manual",

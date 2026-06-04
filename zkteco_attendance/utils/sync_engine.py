@@ -89,7 +89,7 @@ def run_sync_for_frequency(frequency: str):
     for device_name in devices:
         try:
             frappe.enqueue(
-                "zkteco_attendance.zkteco_attendance.utils.sync_engine.run_sync_for_device",
+                "zkteco_attendance.utils.sync_engine.run_sync_for_device",
                 device_name=device_name,
                 triggered_by="Scheduler",
                 queue="long",
@@ -119,7 +119,7 @@ class AttendanceSyncEngine:
 
     def execute(self):
         """Run the full sync workflow."""
-        from zkteco_attendance.zkteco_attendance.utils.zk_connector import ZKConnector
+        from zkteco_attendance.utils.zk_connector import ZKConnector
 
         connector = ZKConnector(self.device)
         try:
@@ -206,7 +206,7 @@ class AttendanceSyncEngine:
             return "skipped"
 
         # Determine log type (IN/OUT)
-        from zkteco_attendance.zkteco_attendance.utils.zk_connector import ZKConnector
+        from zkteco_attendance.utils.zk_connector import ZKConnector
         punch_type = getattr(record, "punch", 0)
         log_type = ZKConnector.punch_type_to_log_type(punch_type)
 

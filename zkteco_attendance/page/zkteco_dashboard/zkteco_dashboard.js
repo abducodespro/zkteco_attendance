@@ -106,7 +106,7 @@ frappe.pages["zkteco-dashboard"].on_page_load = function (wrapper) {
 
 	function load_dashboard() {
 		frappe.call({
-			method: "zkteco_attendance.zkteco_attendance.doctype.biometric_device.biometric_device.get_dashboard_stats",
+			method: "zkteco_attendance.doctype.biometric_device.biometric_device.get_dashboard_stats",
 			callback: (r) => {
 				if (r.exc) return;
 				const d = r.message;
@@ -178,7 +178,7 @@ frappe.pages["zkteco-dashboard"].on_page_load = function (wrapper) {
 
 	function load_sync_logs() {
 		frappe.call({
-			method: "zkteco_attendance.zkteco_attendance.doctype.biometric_device.biometric_device.get_sync_logs",
+			method: "zkteco_attendance.doctype.biometric_device.biometric_device.get_sync_logs",
 			args: { limit: 15 },
 			callback: (r) => {
 				if (!r.message || !r.message.length) {
@@ -218,7 +218,7 @@ frappe.pages["zkteco-dashboard"].on_page_load = function (wrapper) {
 			__("Sync device <b>{0}</b> now?", [device_name]),
 			() => {
 				frappe.call({
-					method: "zkteco_attendance.zkteco_attendance.doctype.biometric_device.biometric_device.sync_device",
+					method: "zkteco_attendance.doctype.biometric_device.biometric_device.sync_device",
 					args: { device_name, triggered_by: "Manual" },
 					callback: (r) => {
 						frappe.show_alert({ message: r.message?.message || __("Sync job queued"), indicator: "green" });
@@ -232,7 +232,7 @@ frappe.pages["zkteco-dashboard"].on_page_load = function (wrapper) {
 	window.test_device = function (device_name) {
 		const d = frappe.msgprint(__("Testing connection to {0}…", [device_name]));
 		frappe.call({
-			method: "zkteco_attendance.zkteco_attendance.doctype.biometric_device.biometric_device.test_connection",
+			method: "zkteco_attendance.doctype.biometric_device.biometric_device.test_connection",
 			args: { device_name },
 			callback: (r) => {
 				frappe.hide_msgprint();
@@ -266,7 +266,7 @@ frappe.pages["zkteco-dashboard"].on_page_load = function (wrapper) {
 			__("Sync ALL active devices now?"),
 			() => {
 				frappe.call({
-					method: "zkteco_attendance.zkteco_attendance.doctype.biometric_device.biometric_device.sync_all_devices",
+					method: "zkteco_attendance.doctype.biometric_device.biometric_device.sync_all_devices",
 					callback: (r) => {
 						frappe.show_alert({ message: r.message?.message, indicator: "green" });
 						setTimeout(load_dashboard, 3000);

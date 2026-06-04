@@ -126,7 +126,7 @@ def test_connection(device_name: str) -> dict:
 
     Returns a dict with device info or error details.
     """
-    from zkteco_attendance.zkteco_attendance.utils.zk_connector import ZKConnector
+    from zkteco_attendance.utils.zk_connector import ZKConnector
 
     device = frappe.get_doc("Biometric Device", device_name)
     connector = ZKConnector(device)
@@ -163,7 +163,7 @@ def sync_device(device_name: str, triggered_by: str = "Manual") -> dict:
         frappe.throw(_("Device {0} is not Active").format(device_name))
 
     frappe.enqueue(
-        "zkteco_attendance.zkteco_attendance.utils.sync_engine.run_sync_for_device",
+        "zkteco_attendance.utils.sync_engine.run_sync_for_device",
         device_name=device_name,
         triggered_by=triggered_by,
         queue="long",
@@ -198,7 +198,7 @@ def sync_all_devices() -> dict:
 
     for device_name in devices:
         frappe.enqueue(
-            "zkteco_attendance.zkteco_attendance.utils.sync_engine.run_sync_for_device",
+            "zkteco_attendance.utils.sync_engine.run_sync_for_device",
             device_name=device_name,
             triggered_by="Manual",
             queue="long",

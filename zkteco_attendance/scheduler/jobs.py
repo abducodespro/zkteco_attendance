@@ -67,7 +67,7 @@ def _run_for_frequency(frequency: str):
     Wraps the sync engine to catch top-level scheduler errors.
     """
     try:
-        from zkteco_attendance.zkteco_attendance.utils.sync_engine import (
+        from zkteco_attendance.utils.sync_engine import (
             run_sync_for_frequency,
         )
         run_sync_for_frequency(frequency)

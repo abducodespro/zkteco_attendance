@@ -21,37 +21,37 @@ after_migrate = "zkteco_attendance.install.after_migrate"
 scheduler_events = {
     "cron": {
         "*/5 * * * *": [
-            "zkteco_attendance.zkteco_attendance.scheduler.jobs.sync_5min_devices"
+            "zkteco_attendance.scheduler.jobs.sync_5min_devices"
         ],
         "*/15 * * * *": [
-            "zkteco_attendance.zkteco_attendance.scheduler.jobs.sync_15min_devices"
+            "zkteco_attendance.scheduler.jobs.sync_15min_devices"
         ],
         "*/30 * * * *": [
-            "zkteco_attendance.zkteco_attendance.scheduler.jobs.sync_30min_devices"
+            "zkteco_attendance.scheduler.jobs.sync_30min_devices"
         ],
     },
     "hourly": [
-        "zkteco_attendance.zkteco_attendance.scheduler.jobs.sync_hourly_devices"
+        "zkteco_attendance.scheduler.jobs.sync_hourly_devices"
     ],
     "daily": [
-        "zkteco_attendance.zkteco_attendance.scheduler.jobs.sync_daily_devices",
-        "zkteco_attendance.zkteco_attendance.scheduler.jobs.cleanup_old_logs",
+        "zkteco_attendance.scheduler.jobs.sync_daily_devices",
+        "zkteco_attendance.scheduler.jobs.cleanup_old_logs",
     ],
 }
 
 # Permissions
 # -----------
 has_permission = {
-    "Biometric Device": "zkteco_attendance.zkteco_attendance.doctype.biometric_device.biometric_device.has_permission",
-    "Attendance Sync Log": "zkteco_attendance.zkteco_attendance.doctype.attendance_sync_log.attendance_sync_log.has_permission",
-    "Device Employee Mapping": "zkteco_attendance.zkteco_attendance.doctype.device_employee_mapping.device_employee_mapping.has_permission",
+    "Biometric Device": "zkteco_attendance.doctype.biometric_device.biometric_device.has_permission",
+    "Attendance Sync Log": "zkteco_attendance.doctype.attendance_sync_log.attendance_sync_log.has_permission",
+    "Device Employee Mapping": "zkteco_attendance.doctype.device_employee_mapping.device_employee_mapping.has_permission",
 }
 
 # Document Events
 # ---------------
 doc_events = {
     "Biometric Device": {
-        "before_save": "zkteco_attendance.zkteco_attendance.doctype.biometric_device.biometric_device.before_save",
-        "on_trash": "zkteco_attendance.zkteco_attendance.doctype.biometric_device.biometric_device.on_trash",
+        "before_save": "zkteco_attendance.doctype.biometric_device.biometric_device.before_save",
+        "on_trash": "zkteco_attendance.doctype.biometric_device.biometric_device.on_trash",
     }
 }

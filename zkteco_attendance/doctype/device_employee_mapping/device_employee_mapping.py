@@ -62,7 +62,7 @@ def get_unmapped_device_users(device_name: str) -> list:
     Return list of device users that don't have an employee mapping yet.
     Useful for the bulk-mapping UI.
     """
-    from zkteco_attendance.zkteco_attendance.utils.zk_connector import ZKConnector
+    from zkteco_attendance.utils.zk_connector import ZKConnector
 
     device = frappe.get_doc("Biometric Device", device_name)
     connector = ZKConnector(device)
