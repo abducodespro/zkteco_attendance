@@ -4,7 +4,7 @@ version = "1.0.0"
 description = "ZKTeco Biometric Attendance Integration for ERPNext/Frappe"
 readme = "README.md"
 license = { text = "MIT" }
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
     "pyzk>=0.9",
     "pytz>=2021.1",
