@@ -1,32 +1,15 @@
 app_name = "zkteco_attendance"
 app_title = "ZKTeco Attendance"
 app_publisher = "Your Organization"
-app_description = "ZKTeco Biometric Attendance Integration for ERPNext/Frappe v15/v16"
+app_description = "ZKTeco Biometric Attendance Integration for ERPNext/Frappe v14"
 app_email = "admin@example.com"
 app_license = "MIT"
 app_version = "1.0.0"
 
-
-# -----------------------------------------------------------------
-# Asset Includes
-# app_include_css / app_include_js require a proper esbuild bundle
-# entry-point declared in package.json. We skip the global JS
-# include entirely — the dashboard page JS is loaded by the Page
-# framework automatically, and doctype_js handles form JS.
-# -----------------------------------------------------------------
-
-# DocType JS — loaded only when that DocType form is opened.
-# Frappe serves these files directly from the app's public/ folder;
-# they do NOT go through esbuild, so no package.json entry needed.
+# DocType JS — loaded when the DocType form is opened
 doctype_js = {
     "Biometric Device": "public/js/biometric_device.bundle.js",
 }
-
-# Fixtures
-fixtures = [
-    {"dt": "Role", "filters": [["name", "in", ["HR Manager", "Attendance Manager"]]]},
-    {"dt": "Workspace", "filters": [["module", "=", "ZKTeco Attendance"]]},
-]
 
 # Installation
 # ------------
@@ -37,15 +20,12 @@ after_migrate = "zkteco_attendance.install.after_migrate"
 # ----------------
 scheduler_events = {
     "cron": {
-        # Every 5 minutes
         "*/5 * * * *": [
             "zkteco_attendance.zkteco_attendance.scheduler.jobs.sync_5min_devices"
         ],
-        # Every 15 minutes
         "*/15 * * * *": [
             "zkteco_attendance.zkteco_attendance.scheduler.jobs.sync_15min_devices"
         ],
-        # Every 30 minutes
         "*/30 * * * *": [
             "zkteco_attendance.zkteco_attendance.scheduler.jobs.sync_30min_devices"
         ],
