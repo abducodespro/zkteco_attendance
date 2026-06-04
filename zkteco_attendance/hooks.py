@@ -6,8 +6,6 @@ app_email = "admin@example.com"
 app_license = "MIT"
 app_version = "1.0.0"
 
-# Required Apps
-required_apps = ["erpnext"]
 
 # -----------------------------------------------------------------
 # Asset Includes
