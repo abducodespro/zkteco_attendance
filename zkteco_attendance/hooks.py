@@ -21,7 +21,7 @@ required_apps = ["erpnext"]
 # Frappe serves these files directly from the app's public/ folder;
 # they do NOT go through esbuild, so no package.json entry needed.
 doctype_js = {
-    "Biometric Device": "public/js/biometric_device.js",
+    "Biometric Device": "public/js/biometric_device.bundle.js",
 }
 
 # Fixtures
