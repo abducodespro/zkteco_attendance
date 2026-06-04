@@ -19,3 +19,12 @@ build-backend = "flit_core.buildapi"
 
 [tool.flit.module]
 name = "zkteco_attendance"
+
+[tool.flit.include]
+"zkteco_attendance/doctype/**/*.json" = "zkteco_attendance/doctype/**/*.json"
+"zkteco_attendance/page/**/*.json" = "zkteco_attendance/page/**/*.json"
+"zkteco_attendance/workspace/*.json" = "zkteco_attendance/workspace/*.json"
+"zkteco_attendance/public/**/*.js" = "zkteco_attendance/public/**/*.js"
+"zkteco_attendance/public/**/*.css" = "zkteco_attendance/public/**/*.css"
+"zkteco_attendance/**/*.md" = "zkteco_attendance/**/*.md"
+"zkteco_attendance/**/*.txt" = "zkteco_attendance/**/*.txt"
