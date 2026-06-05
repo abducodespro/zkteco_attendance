@@ -1,2 +1,17 @@
 include MANIFEST.in
-recursive-include zkteco_attendance *.json *.js *.css *.html *.py *.txt *.md
+include requirements.txt
+include *.json
+include *.md
+include *.py
+include *.txt
+recursive-include zkteco_attendance *.css
+recursive-include zkteco_attendance *.csv
+recursive-include zkteco_attendance *.html
+recursive-include zkteco_attendance *.js
+recursive-include zkteco_attendance *.json
+recursive-include zkteco_attendance *.md
+recursive-include zkteco_attendance *.png
+recursive-include zkteco_attendance *.py
+recursive-include zkteco_attendance *.svg
+recursive-include zkteco_attendance *.txt
+recursive-exclude zkteco_attendance *.pyc

@@ -8,12 +8,11 @@
  "name": "zkteco-dashboard",
  "owner": "Administrator",
  "page_name": "zkteco-dashboard",
- "restrict_to_domain": "",
  "roles": [
   {"role": "System Manager"},
   {"role": "HR Manager"},
   {"role": "Attendance Manager"}
  ],
  "standard": "Yes",
- "title": "ZKTeco Attendance Dashboard"
+ "title": "ZKTeco Dashboard"
 }

@@ -1,0 +1,89 @@
+{
+ "charts": [],
+ "content": "[{\"id\":\"zk_header\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">ZKTeco Attendance</span>\",\"col\":12}},{\"id\":\"zk_card\",\"type\":\"card\",\"data\":{\"card_name\":\"ZKTeco Attendance\",\"col\":4}}]",
+ "creation": "2024-01-01 00:00:00.000000",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "device-mobile",
+ "idx": 0,
+ "is_hidden": 0,
+ "label": "ZKTeco Attendance",
+ "links": [
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "ZKTeco Attendance",
+   "link_count": 4,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Biometric Device",
+   "link_count": 0,
+   "link_to": "Biometric Device",
+   "link_type": "DocType",
+   "onboard": 1,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Device Employee Mapping",
+   "link_count": 0,
+   "link_to": "Device Employee Mapping",
+   "link_type": "DocType",
+   "onboard": 1,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Attendance Sync Log",
+   "link_count": 0,
+   "link_to": "Attendance Sync Log",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2024-01-01 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ZKTeco Attendance",
+ "name": "ZKTeco Attendance",
+ "number_cards": [],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [],
+ "sequence_id": 99.0,
+ "shortcuts": [
+  {
+   "color": "Blue",
+   "format": "{0}",
+   "label": "Biometric Device",
+   "link_to": "Biometric Device",
+   "type": "DocType"
+  },
+  {
+   "color": "Green",
+   "format": "{0}",
+   "label": "Device Employee Mapping",
+   "link_to": "Device Employee Mapping",
+   "type": "DocType"
+  },
+  {
+   "color": "Orange",
+   "format": "{0}",
+   "label": "Attendance Sync Log",
+   "link_to": "Attendance Sync Log",
+   "type": "DocType"
+  }
+ ],
+ "title": "ZKTeco Attendance"
+}

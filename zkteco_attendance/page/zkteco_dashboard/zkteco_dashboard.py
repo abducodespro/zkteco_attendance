@@ -1,10 +1,7 @@
-"""
-ZKTeco Dashboard page controller.
-"""
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
 import frappe
 
-
 def get_context(context):
-    """Inject context into the dashboard Jinja template."""
     context.no_cache = 1
     context.title = "ZKTeco Attendance Dashboard"

@@ -1,46 +1,8 @@
-# Python
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
-*.egg
 *.egg-info/
 dist/
 build/
-*.egg-info
-.eggs/
-.installed.cfg
-*.pyc
-
-# Virtual environments
-env/
-venv/
-.venv/
-
-# IDE
-.vscode/
-.idea/
-*.sublime-project
-*.sublime-workspace
-
-# OS
 .DS_Store
-Thumbs.db
-
-# Frappe / ERPNext
-*.lock
 node_modules/
-.cache/
-www/
-sites/
-logs/
-
-# Test artifacts
-.pytest_cache/
-htmlcov/
-.coverage
-coverage.xml
-
-# Distribution
 *.zip
-*.tar.gz

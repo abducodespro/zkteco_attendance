@@ -1,7 +1,7 @@
 {
  "actions": [],
  "autoname": "ZK-SYNC-.YYYY.-.MM.-.DD.-.#####",
- "creation": "2024-01-01 00:00:00.000000",
+ "creation": "2026-06-05 05:32:18.502243",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
@@ -105,8 +105,8 @@
    "label": "Error Details"
   }
  ],
- "in_create": 0,
- "modified": "2024-01-01 00:00:00.000000",
+ "links": [],
+ "modified": "2026-06-05 05:32:18.502243",
  "modified_by": "Administrator",
  "module": "ZKTeco Attendance",
  "name": "Attendance Sync Log",
