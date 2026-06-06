@@ -1,4 +1,2 @@
-# ZKTeco device communication
-pyzk>=0.9
-# Timezone handling
-pytz>=2021.1
+pyzk==0.9
+frappe

@@ -7,6 +7,7 @@ include *.txt
 recursive-include zkteco_attendance *.css
 recursive-include zkteco_attendance *.csv
 recursive-include zkteco_attendance *.html
+recursive-include zkteco_attendance *.ico
 recursive-include zkteco_attendance *.js
 recursive-include zkteco_attendance *.json
 recursive-include zkteco_attendance *.md

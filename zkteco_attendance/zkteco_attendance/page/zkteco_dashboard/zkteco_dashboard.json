@@ -1,0 +1,16 @@
+{
+ "creation": "2024-01-01 00:00:00.000000",
+ "doctype": "Page",
+ "icon": "device",
+ "module": "Zkteco Attendance",
+ "name": "zkteco-dashboard",
+ "page_name": "zkteco-dashboard",
+ "roles": [
+  {"role": "System Manager"},
+  {"role": "HR Manager"},
+  {"role": "Biometric Device Manager"}
+ ],
+ "standard": "Yes",
+ "system_page": 0,
+ "title": "ZKTeco Dashboard"
+}

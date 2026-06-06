@@ -1,0 +1,204 @@
+{
+ "actions": [],
+ "allow_import": 1,
+ "autoname": "field:device_name",
+ "creation": "2024-01-01 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "device_name",
+  "device_ip",
+  "port",
+  "device_id",
+  "column_break_1",
+  "company",
+  "location",
+  "status",
+  "last_sync_time",
+  "section_auth",
+  "time_zone",
+  "connection_password",
+  "section_sync",
+  "auto_sync_enabled",
+  "sync_frequency",
+  "fetch_mode",
+  "clear_device_logs_after_sync",
+  "employee_mapping_method",
+  "section_notes",
+  "remarks"
+ ],
+ "fields": [
+  {
+   "fieldname": "device_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Device Name",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "device_ip",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Device IP",
+   "reqd": 1
+  },
+  {
+   "default": "4370",
+   "fieldname": "port",
+   "fieldtype": "Int",
+   "label": "Port",
+   "reqd": 1
+  },
+  {
+   "fieldname": "device_id",
+   "fieldtype": "Data",
+   "label": "Device ID"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "location",
+   "fieldtype": "Link",
+   "label": "Location",
+   "options": "Location"
+  },
+  {
+   "default": "Active",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Active\nInactive"
+  },
+  {
+   "fieldname": "last_sync_time",
+   "fieldtype": "Datetime",
+   "label": "Last Sync Time",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_auth",
+   "fieldtype": "Section Break",
+   "label": "Authentication"
+  },
+  {
+   "default": "Africa/Addis_Ababa",
+   "fieldname": "time_zone",
+   "fieldtype": "Select",
+   "label": "Device Time Zone",
+   "options": "UTC\nAfrica/Addis_Ababa\nAfrica/Nairobi\nAfrica/Cairo\nAfrica/Lagos\nAsia/Riyadh\nAsia/Dubai\nAsia/Kolkata\nAsia/Shanghai\nEurope/London\nEurope/Berlin\nAmerica/New_York\nAmerica/Los_Angeles"
+  },
+  {
+   "fieldname": "connection_password",
+   "fieldtype": "Password",
+   "label": "Connection Password"
+  },
+  {
+   "fieldname": "section_sync",
+   "fieldtype": "Section Break",
+   "label": "Sync Configuration"
+  },
+  {
+   "default": "1",
+   "fieldname": "auto_sync_enabled",
+   "fieldtype": "Check",
+   "label": "Auto Sync Enabled"
+  },
+  {
+   "default": "30 Min",
+   "fieldname": "sync_frequency",
+   "fieldtype": "Select",
+   "label": "Sync Frequency",
+   "options": "5 Min\n15 Min\n30 Min\nHourly\nDaily"
+  },
+  {
+   "default": "New Records Only",
+   "fieldname": "fetch_mode",
+   "fieldtype": "Select",
+   "label": "Fetch Mode",
+   "options": "All Records\nNew Records Only"
+  },
+  {
+   "default": "0",
+   "fieldname": "clear_device_logs_after_sync",
+   "fieldtype": "Check",
+   "label": "Clear Device Logs After Sync"
+  },
+  {
+   "default": "Biometric ID",
+   "fieldname": "employee_mapping_method",
+   "fieldtype": "Select",
+   "label": "Employee Mapping Method",
+   "options": "Biometric ID"
+  },
+  {
+   "fieldname": "section_notes",
+   "fieldtype": "Section Break",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  }
+ ],
+ "links": [],
+ "modified": "2024-01-01 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Zkteco Attendance",
+ "name": "Biometric Device",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "HR Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Biometric Device Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

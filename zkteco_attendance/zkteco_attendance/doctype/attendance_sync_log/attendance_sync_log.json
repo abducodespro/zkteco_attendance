@@ -1,0 +1,143 @@
+{
+ "actions": [],
+ "autoname": "SYNC-.#####",
+ "creation": "2024-01-01 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "device",
+  "triggered_by",
+  "sync_status",
+  "column_break_1",
+  "start_time",
+  "end_time",
+  "section_counts",
+  "total_records_pulled",
+  "new_records_created",
+  "duplicate_records",
+  "failed_records",
+  "section_errors",
+  "error_details"
+ ],
+ "fields": [
+  {
+   "fieldname": "device",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Device",
+   "options": "Biometric Device",
+   "reqd": 1
+  },
+  {
+   "fieldname": "triggered_by",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Triggered By",
+   "options": "Manual\nScheduler"
+  },
+  {
+   "fieldname": "sync_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Sync Status",
+   "options": "Success\nPartial\nFailed"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "start_time",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Start Time"
+  },
+  {
+   "fieldname": "end_time",
+   "fieldtype": "Datetime",
+   "label": "End Time"
+  },
+  {
+   "fieldname": "section_counts",
+   "fieldtype": "Section Break",
+   "label": "Record Counts"
+  },
+  {
+   "default": "0",
+   "fieldname": "total_records_pulled",
+   "fieldtype": "Int",
+   "label": "Total Records Pulled"
+  },
+  {
+   "default": "0",
+   "fieldname": "new_records_created",
+   "fieldtype": "Int",
+   "label": "New Records Created"
+  },
+  {
+   "default": "0",
+   "fieldname": "duplicate_records",
+   "fieldtype": "Int",
+   "label": "Duplicate Records"
+  },
+  {
+   "default": "0",
+   "fieldname": "failed_records",
+   "fieldtype": "Int",
+   "label": "Failed Records"
+  },
+  {
+   "fieldname": "section_errors",
+   "fieldtype": "Section Break",
+   "label": "Error Details"
+  },
+  {
+   "fieldname": "error_details",
+   "fieldtype": "Long Text",
+   "label": "Error Details",
+   "read_only": 1
+  }
+ ],
+ "links": [],
+ "modified": "2024-01-01 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Zkteco Attendance",
+ "name": "Attendance Sync Log",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "HR Manager",
+   "share": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Biometric Device Manager",
+   "share": 1
+  }
+ ],
+ "sort_field": "start_time",
+ "sort_order": "DESC",
+ "track_changes": 0
+}

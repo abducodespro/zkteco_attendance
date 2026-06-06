@@ -1,0 +1,30 @@
+/* ZKTeco Attendance — Custom Styles */
+
+.zkteco-dashboard {
+    padding: 20px;
+}
+
+.zkteco-stat-card {
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 20px;
+    text-align: center;
+    background: var(--card-bg);
+    margin-bottom: 16px;
+}
+
+.zkteco-stat-card .stat-value {
+    font-size: 2.4rem;
+    font-weight: 700;
+    color: var(--text-color);
+}
+
+.zkteco-stat-card .stat-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+.zkteco-stat-card.online  .stat-value { color: var(--green-500); }
+.zkteco-stat-card.offline .stat-value { color: var(--red-500); }
+.zkteco-stat-card.failed  .stat-value { color: var(--orange-500); }
