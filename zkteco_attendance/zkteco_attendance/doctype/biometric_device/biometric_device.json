@@ -44,7 +44,9 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Device IP",
-   "reqd": 1
+   "reqd": 1,
+   "default": "192.168.1.201",
+   "description": "Change it with your biometric device IP."
   },
   {
    "default": "4370",
@@ -105,7 +107,9 @@
   {
    "fieldname": "connection_password",
    "fieldtype": "Password",
-   "label": "Connection Password"
+   "label": "Connection Password",
+   "description": "Connection password is Comm Key of the biometric device. Usualy 0 or 1234. Also you can check it in your biometric device",
+   "default": "0"
   },
   {
    "fieldname": "section_sync",

@@ -417,3 +417,109 @@ def process_employee(employee, from_date, to_date,
         "manual_review_days":  manual_review_days,
         "remarks":             ", ".join(remarks_list[:5]) if remarks_list else "",
     }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Per-employee, per-day breakdown (for the Daily Checkins dashboard)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def get_employee_daily_breakdown(employee, from_date, to_date,
+                                  checkin_list, default_shift_name,
+                                  doc_method, doc_missing_action):
+    """
+    Like `process_employee`, but returns a day-by-day breakdown instead of
+    (only) totals. Used by the Daily Checkins dashboard.
+
+    Returns a list of dicts, one per working day in the range:
+      {
+        date:           "YYYY-MM-DD",
+        weekday:        "Monday",
+        status:         "Present" | "Half Day" | "Absent" | "Invalid" | "Manual Review",
+        hours:          float,
+        overtime_hours: float,
+        checkins: [
+          {time: "HH:MM:SS", log_type: "IN"/"OUT", is_overtime: bool},
+          ...
+        ]
+      }
+    """
+    from_date = getdate(from_date)
+    to_date   = getdate(to_date)
+    working_days_list = get_working_days_in_range(from_date, to_date)
+
+    shift = get_shift_for_employee(employee, from_date, default_shift_name)
+
+    daily_checkins = group_checkins_by_date(
+        checkin_list, shift,
+        default_method=doc_method,
+        from_date=from_date, to_date=to_date
+    )
+
+    breakdown = []
+    for work_date in working_days_list:
+        day_shift    = get_shift_for_employee(employee, work_date, default_shift_name) or shift or {}
+        day_checkins = sorted(daily_checkins.get(work_date, []), key=lambda c: c["time"])
+
+        result = classify_day(day_checkins, day_shift, doc_method, doc_missing_action)
+
+        breakdown.append({
+            "date":           str(work_date),
+            "weekday":        work_date.strftime("%A"),
+            "status":         result["status"],
+            "hours":          result["hours"],
+            "overtime_hours": result.get("overtime_hours", 0.0),
+            "checkins": [
+                {
+                    "time":        c["time"].strftime("%H:%M:%S"),
+                    "log_type":    c["log_type"],
+                    "is_overtime": bool(c.get("is_overtime")),
+                }
+                for c in day_checkins
+            ],
+        })
+
+    return breakdown
+
+
+def get_daily_checkins_data(attendance_summary):
+    """
+    Build the full payload for the Daily Checkins dashboard from an
+    Attendance Summary document: from_date, to_date, and a per-employee
+    day-by-day checkin breakdown.
+    """
+    doc = frappe.get_doc("Attendance Summary", attendance_summary)
+
+    employee_list = [row.employee for row in doc.details]
+    checkins_by_employee = fetch_checkins(employee_list, doc.from_date, doc.to_date)
+
+    doc_method         = doc.working_hours_method
+    doc_missing_action = doc.missing_checkin_action
+    default_shift      = doc.shift_type
+
+    employees = []
+    for row in doc.details:
+        emp_checkins = checkins_by_employee.get(row.employee, [])
+        days = get_employee_daily_breakdown(
+            employee=row.employee,
+            from_date=doc.from_date,
+            to_date=doc.to_date,
+            checkin_list=emp_checkins,
+            default_shift_name=default_shift,
+            doc_method=doc_method,
+            doc_missing_action=doc_missing_action,
+        )
+        employees.append({
+            "employee":      row.employee,
+            "employee_name": row.employee_name,
+            "department":    row.department,
+            "designation":   row.designation,
+            "days": days,
+        })
+
+    return {
+        "attendance_summary": doc.name,
+        "company":            doc.company,
+        "from_date":          str(doc.from_date),
+        "to_date":            str(doc.to_date),
+        "employees":          employees,
+    }

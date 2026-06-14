@@ -141,6 +141,25 @@ def get_latest_sync_log(device_name):
 
 
 @frappe.whitelist()
+def get_daily_checkins(attendance_summary):
+    """
+    Return per-employee, per-day checkin breakdown for the Daily Checkins
+    dashboard, sourced from an Attendance Summary's From Date / To Date /
+    Employee list.
+    """
+    frappe.only_for(["System Manager", "HR Manager", "Biometric Device Manager"])
+
+    if not attendance_summary:
+        frappe.throw(_("Attendance Summary is required."))
+
+    if not frappe.db.exists("Attendance Summary", attendance_summary):
+        frappe.throw(_("Attendance Summary {0} not found.").format(attendance_summary))
+
+    from zkteco_attendance.zkteco_attendance.attendance_processor import get_daily_checkins_data
+    return get_daily_checkins_data(attendance_summary)
+
+
+@frappe.whitelist()
 def get_dashboard_data():
     """Aggregate data (including chart series) for the ZKTeco dashboard page."""
     frappe.only_for(["System Manager", "HR Manager", "Biometric Device Manager"])

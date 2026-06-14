@@ -9,7 +9,7 @@ and v16.
 
 ## 1. Installation
 
-## Fresh install
+### Fresh install
 ```bash
 bench get-app https://github.com/abducodespro/zkteco_attendance --skip-assets
 bench --site frappe.com install-app zkteco_attendance
@@ -17,7 +17,7 @@ bench --site frappe.com migrate
 bench build --app zkteco_attendance
 bench start
 ```
-## Clean up if needed
+### Clean up if needed
 ```bash
 bench --site frappe.com uninstall-app zkteco_attendance 2>/dev/null; true
 rm -rf ~/frappe-bench/apps/zkteco_attendance
@@ -171,7 +171,25 @@ Detail** and **Attendance Summary** after processing.
 
 ---
 
-## 6. Dashboard & Workspace Chart
+## 6. Employee Daily Checkins Dashboard
+
+From an **Attendance Summary** (with employees already fetched), click
+**View Daily Checkins** (under *View*) to open the **Employee Daily
+Checkins** dashboard for that summary.
+
+- The dashboard's **Attendance Summary** field is pre-filled; changing it
+  loads a different summary's data.
+- **From Date** / **To Date** / **employees** are pulled directly from the
+  selected Attendance Summary.
+- Each employee appears as a collapsible card. Expanding it shows a table
+  with one row per day: date, weekday, status (Present / Half Day / Absent
+  / Invalid / Manual Review), total hours, overtime hours, and a chip for
+  every check-in (time + IN/OUT, with overtime punches highlighted).
+
+This is useful for spot-checking raw punches behind a Present/Absent/Half
+Day result before finalizing payroll.
+
+## 7. Dashboard & Workspace Chart
 
 The **Biometric Attendance** workspace includes a built-in **Check-ins
 (Last 7 Days)** bar chart at the top, showing daily Employee Checkin counts
@@ -192,7 +210,7 @@ every 60 seconds.
 
 ---
 
-## 7. Permissions
+## 8. Permissions
 
 Three roles can access this app's doctypes: **System Manager**, **HR
 Manager**, and **Biometric Device Manager** (created automatically on
@@ -201,7 +219,7 @@ HR or System Manager access).
 
 ---
 
-## 8. Troubleshooting
+## 9. Troubleshooting
 
 - **Connection failed** — check Device IP/Port, that the device is on the
   same network/VPN as the ERPNext server, and that no firewall blocks the

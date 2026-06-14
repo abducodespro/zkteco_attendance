@@ -29,6 +29,9 @@
   {"fieldname":"total_overtime_hours","fieldtype":"Float","label":"Total Overtime Hours","read_only":1}
  ],
  "links": [],
+ "modified": "2024-01-01 00:00:00.000000",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
  "module": "Zkteco Attendance",
  "name": "Attendance Summary",
  "permissions": [

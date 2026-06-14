@@ -9,6 +9,8 @@ from frappe import _
 def after_install():
     """Run after app is installed via bench install-app."""
     _create_biometric_device_manager_role()
+    _add_employee_biometric_field()
+    _add_employee_checkin_device_field()
     _add_employee_checkin_zk_uid_field()
     _add_employee_checkin_overtime_field()
     frappe.db.commit()
@@ -30,10 +32,77 @@ def _create_biometric_device_manager_role():
         })
         role.insert(ignore_permissions=True)
 
+
+def _field_exists(doctype, fieldname):
+    """
+    True if `fieldname` already exists on `doctype` — whether as a
+    standard/core field (e.g. ERPNext HR's Employee.attendance_device_id)
+    or as a previously-created Custom Field. Checking the doctype meta
+    (instead of only `Custom Field`) avoids "field already exists" errors
+    on installs where the field is already part of core.
+    """
+    try:
+        if frappe.get_meta(doctype).has_field(fieldname):
+            return True
+    except Exception:
+        pass
+
+    return frappe.db.exists("Custom Field", {"dt": doctype, "fieldname": fieldname})
+
+
+def _add_employee_biometric_field():
+    """
+    Add a 'Biometric Attendance ID' field to Employee, used to match
+    attendance device records to ERPNext employees.
+
+    ERPNext's HR module already ships a core `attendance_device_id` field
+    on Employee — if present, we reuse it as-is and do nothing further.
+    Only create the Custom Field if neither a core nor custom version of
+    this field exists yet.
+    """
+    if _field_exists("Employee", "attendance_device_id"):
+        return
+
+    cf = frappe.get_doc({
+        "doctype": "Custom Field",
+        "dt": "Employee",
+        "module": "Zkteco Attendance",
+        "label": "Biometric Attendance ID",
+        "fieldname": "attendance_device_id",
+        "fieldtype": "Data",
+        "insert_after": "employee_number",
+        "description": "ID enrolled on the ZKTeco biometric device. Used to match attendance records.",
+        "in_list_view": 0,
+        "search_index": 1,
+    })
+    cf.insert(ignore_permissions=True)
+
+
+def _add_employee_checkin_device_field():
+    """Add device_id field to Employee Checkin if not already there."""
+    if _field_exists("Employee Checkin", "device_id"):
+        return
+
+    cf = frappe.get_doc({
+        "doctype": "Custom Field",
+        "dt": "Employee Checkin",
+        "module": "Zkteco Attendance",
+        "label": "Biometric Device",
+        "fieldname": "device_id",
+        "fieldtype": "Data",
+        "insert_after": "log_type",
+        "description": "ZKTeco device that recorded this checkin.",
+        "in_list_view": 0,
+    })
+    cf.insert(ignore_permissions=True)
+
+
 def _add_employee_checkin_zk_uid_field():
     """Add zk_uid field to Employee Checkin (raw device record id, used for de-duplication)."""
-    if frappe.db.exists("Custom Field", {"dt": "Employee Checkin", "fieldname": "zk_uid"}):
+    if _field_exists("Employee Checkin", "zk_uid"):
         return
+
+    insert_after = "device_id" if _field_exists("Employee Checkin", "device_id") else "log_type"
 
     cf = frappe.get_doc({
         "doctype": "Custom Field",
@@ -42,7 +111,7 @@ def _add_employee_checkin_zk_uid_field():
         "label": "ZK Device Record ID",
         "fieldname": "zk_uid",
         "fieldtype": "Data",
-        "insert_after": "device_id",
+        "insert_after": insert_after,
         "description": "Raw attendance record ID (uid) from the biometric device.",
         "in_list_view": 0,
         "read_only": 1,
@@ -53,8 +122,10 @@ def _add_employee_checkin_zk_uid_field():
 
 def _add_employee_checkin_overtime_field():
     """Add is_overtime checkbox to Employee Checkin for overtime punches (OT In/Out)."""
-    if frappe.db.exists("Custom Field", {"dt": "Employee Checkin", "fieldname": "is_overtime"}):
+    if _field_exists("Employee Checkin", "is_overtime"):
         return
+
+    insert_after = "zk_uid" if _field_exists("Employee Checkin", "zk_uid") else "log_type"
 
     cf = frappe.get_doc({
         "doctype": "Custom Field",
@@ -63,7 +134,7 @@ def _add_employee_checkin_overtime_field():
         "label": "Overtime Punch",
         "fieldname": "is_overtime",
         "fieldtype": "Check",
-        "insert_after": "zk_uid",
+        "insert_after": insert_after,
         "description": "Set when this checkin was recorded as an Overtime In/Out punch (device punch code 4/5).",
         "in_list_view": 1,
         "no_copy": 1,

@@ -19,42 +19,6 @@ class AttendanceSummary(Document):
         if self.from_date and self.to_date and getdate(self.from_date) > getdate(self.to_date):
             frappe.throw(_("From Date cannot be after To Date."))
 
-    # ── called by JS "Fetch Employees" after filter dialog ───────────────────
-    # @frappe.whitelist()
-    # def fetch_employees(self, department=None, designation=None, project=None,
-    #                     branch=None, employment_type=None):
-    #     """
-    #     Fetch active employees matching filters and populate the details child table.
-    #     Preserves existing rows that match; appends new ones.
-    #     """
-    #     filters = {"status": "Active"}
-    #     if self.company:         filters["company"]         = self.company
-    #     if department:           filters["department"]      = department
-    #     if designation:          filters["designation"]     = designation
-    #     if branch:               filters["branch"]          = branch
-    #     if employment_type:      filters["employment_type"] = employment_type
-
-    #     employees = frappe.get_all(
-    #         "Employee", filters=filters,
-    #         fields=["name as employee", "employee_name", "department", "designation"]
-    #     )
-
-    #     existing = {row.employee for row in self.details}
-    #     added = 0
-    #     for emp in employees:
-    #         if emp.employee not in existing:
-    #             self.append("details", {
-    #                 "employee":      emp.employee,
-    #                 "employee_name": emp.employee_name,
-    #                 "department":    emp.department,
-    #                 "designation":   emp.designation,
-    #             })
-    #             added += 1
-
-    #     self.total_employees = len(self.details)
-    #     self.total_working_days = count_working_days(self.from_date, self.to_date)
-    #     self.save()
-    #     return {"added": added, "total": len(self.details)}
     @frappe.whitelist()
     def fetch_employees(company=None, department=None, project=None, designation=None):
         """Fetch active employees matching optional filters for bulk-add to shift assignment."""

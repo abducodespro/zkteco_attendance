@@ -1,0 +1,16 @@
+{
+ "creation": "2024-01-01 00:00:00.000000",
+ "doctype": "Page",
+ "icon": "small-file",
+ "module": "Zkteco Attendance",
+ "name": "zk-daily-checkins",
+ "page_name": "zk-daily-checkins",
+ "roles": [
+  {"role": "System Manager"},
+  {"role": "HR Manager"},
+  {"role": "Biometric Device Manager"}
+ ],
+ "standard": "Yes",
+ "system_page": 0,
+ "title": "Employee Daily Checkins"
+}

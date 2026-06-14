@@ -45,3 +45,41 @@
 .zkteco-pull-progress .progress {
     background-color: var(--bg-color);
 }
+
+/* Employee Daily Checkins dashboard */
+.zk-emp-cards .zk-emp-card {
+    margin-bottom: 10px;
+}
+
+.zk-daily-table th, .zk-daily-table td {
+    vertical-align: middle;
+    font-size: 0.85rem;
+}
+
+.zk-chip {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.78rem;
+    margin: 2px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-color);
+}
+
+.zk-chip-in {
+    border-color: var(--green-200);
+    background: var(--green-50);
+    color: var(--green-700);
+}
+
+.zk-chip-out {
+    border-color: var(--red-200);
+    background: var(--red-50);
+    color: var(--red-700);
+}
+
+.zk-chip-ot {
+    border-color: var(--orange-200);
+    background: var(--orange-50);
+    color: var(--orange-700);
+}

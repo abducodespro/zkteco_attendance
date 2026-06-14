@@ -15,10 +15,14 @@ import frappe
 
 def execute():
     from zkteco_attendance.zkteco_attendance.install import (
+        _add_employee_biometric_field,
+        _add_employee_checkin_device_field,
         _add_employee_checkin_zk_uid_field,
         _add_employee_checkin_overtime_field,
     )
 
+    _add_employee_biometric_field()
+    _add_employee_checkin_device_field()
     _add_employee_checkin_zk_uid_field()
     _add_employee_checkin_overtime_field()
 

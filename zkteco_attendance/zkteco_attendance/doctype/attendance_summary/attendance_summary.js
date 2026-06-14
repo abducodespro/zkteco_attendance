@@ -47,6 +47,11 @@ frappe.ui.form.on("Attendance Summary", {
                     }
                 );
             }, __("Actions"));
+
+            // ── View Daily Checkins ────────────────────────────────────────
+            frm.add_custom_button(__("View Daily Checkins"), function () {
+                frappe.set_route("zk-daily-checkins", frm.doc.name);
+            }, __("View"));
         }
 
         // ── Overtime summary indicator ─────────────────────────────────────
