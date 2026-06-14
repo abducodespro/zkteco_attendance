@@ -24,7 +24,9 @@
   "sync_frequency",
   "fetch_mode",
   "clear_device_logs_after_sync",
+  "clock_offset_minutes",
   "employee_mapping_method",
+  "enable_overtime_punches",
   "section_notes",
   "remarks"
  ],
@@ -96,7 +98,8 @@
    "default": "Africa/Addis_Ababa",
    "fieldname": "time_zone",
    "fieldtype": "Select",
-   "label": "Device Time Zone",
+   "label": "Device Time Zone (Reference Only)",
+   "description": "Informational only — for reference when troubleshooting. Attendance timestamps from the device are stored as-is (assumed to already be local wall-clock time matching this site's timezone). Use 'Device Clock Offset (minutes)' below if the device clock needs correcting.",
    "options": "UTC\nAfrica/Addis_Ababa\nAfrica/Nairobi\nAfrica/Cairo\nAfrica/Lagos\nAsia/Riyadh\nAsia/Dubai\nAsia/Kolkata\nAsia/Shanghai\nEurope/London\nEurope/Berlin\nAmerica/New_York\nAmerica/Los_Angeles"
   },
   {
@@ -136,11 +139,25 @@
    "label": "Clear Device Logs After Sync"
   },
   {
+   "default": "0",
+   "fieldname": "clock_offset_minutes",
+   "fieldtype": "Int",
+   "label": "Device Clock Offset (minutes)",
+   "description": "Use only if the device clock is set to a different time than your ERPNext site's local time. Leave 0 if the device clock already shows correct local wall-clock time (recommended)."
+  },
+  {
    "default": "Biometric ID",
    "fieldname": "employee_mapping_method",
    "fieldtype": "Select",
    "label": "Employee Mapping Method",
    "options": "Biometric ID"
+  },
+  {
+   "default": "1",
+   "fieldname": "enable_overtime_punches",
+   "fieldtype": "Check",
+   "label": "Treat OT Punch Codes (4/5) as Overtime",
+   "description": "If enabled, punches with device punch code 4 (OT In) and 5 (OT Out) are recorded as Overtime log entries instead of regular IN/OUT."
   },
   {
    "fieldname": "section_notes",

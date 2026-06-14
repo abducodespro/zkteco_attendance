@@ -17,6 +17,7 @@
   "new_records_created",
   "duplicate_records",
   "failed_records",
+  "overtime_records",
   "section_errors",
   "error_details"
  ],
@@ -86,6 +87,12 @@
    "fieldname": "failed_records",
    "fieldtype": "Int",
    "label": "Failed Records"
+  },
+  {
+   "default": "0",
+   "fieldname": "overtime_records",
+   "fieldtype": "Int",
+   "label": "Overtime Records"
   },
   {
    "fieldname": "section_errors",

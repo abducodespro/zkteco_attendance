@@ -1,0 +1,2 @@
+zkteco_attendance.patches.v1_1.add_overtime_fields
+zkteco_attendance.patches.v1_2.add_checkins_chart

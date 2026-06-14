@@ -10,11 +10,12 @@ app_license = "MIT"
 app_include_css = "/assets/zkteco_attendance/css/zkteco_attendance.css"
 app_include_js  = "/assets/zkteco_attendance/js/zkteco_attendance.js"
 
-# Frappe v14 auto-loads  <module>/doctype/<name>/<name>.js  — no entry needed here.
+# Frappe v14 auto-loads <module>/doctype/<name>/<name>.js — no doctype_js needed.
 
 after_install    = "zkteco_attendance.zkteco_attendance.install.after_install"
 before_uninstall = "zkteco_attendance.zkteco_attendance.install.before_uninstall"
 
+# v14-compatible scheduler
 scheduler_events = {
     "all": [
         "zkteco_attendance.zkteco_attendance.tasks.scheduler.sync_devices_on_schedule"

@@ -1,0 +1,20 @@
+{
+ "creation": "2024-01-01 00:00:00",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": ["employee","employee_name","department","designation"],
+ "fields": [
+  {"fieldname":"employee","fieldtype":"Link","label":"Employee","options":"Employee","reqd":1,"in_list_view":1,"search_index":1},
+  {"fieldname":"employee_name","fieldtype":"Data","label":"Employee Name","fetch_from":"employee.employee_name","fetch_if_empty":1,"read_only":1,"in_list_view":1},
+  {"fieldname":"department","fieldtype":"Link","label":"Department","options":"Department","fetch_from":"employee.department","fetch_if_empty":1,"read_only":1,"in_list_view":1},
+  {"fieldname":"designation","fieldtype":"Link","label":"Designation","options":"Designation","fetch_from":"employee.designation","fetch_if_empty":1,"read_only":1,"in_list_view":1}
+ ],
+ "istable": 1,
+ "links": [],
+ "module": "Zkteco Attendance",
+ "name": "ZK Shift Assignment Employee",
+ "permissions": [],
+ "sort_field": "employee",
+ "sort_order": "ASC"
+}

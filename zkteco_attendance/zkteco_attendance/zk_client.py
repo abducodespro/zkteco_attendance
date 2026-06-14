@@ -5,9 +5,9 @@ Wraps pyzk library with error handling, logging, and timezone support.
 
 import frappe
 from frappe import _
-from frappe.utils import now_datetime, get_datetime
+from frappe.utils import now_datetime, get_datetime, cint
 import pytz
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 def get_zk_connection(device_doc):
@@ -25,6 +25,8 @@ def get_zk_connection(device_doc):
 
     ip = device_doc.device_ip
     port = int(device_doc.port or 4370)
+
+    # get_password() works the same way across v14/v15/v16
     password = device_doc.get_password("connection_password") or 0
     timeout = 10
 
@@ -99,46 +101,86 @@ def test_device_connection(device_name):
     return result
 
 
-def pull_attendance_from_device(device_doc, fetch_mode="New Records Only"):
+def _adjust_for_clock_offset(timestamp, device_doc):
+    """
+    Most ZKTeco devices report attendance timestamps using the device's own
+    real-time clock, already set to the *local* time the punch happened
+    (e.g. the employee badges at 7:55 AM and the device stores "07:55:00").
+
+    Frappe stores Datetime fields as naive values in the *site's* local
+    timezone (System Settings > Time Zone), NOT in UTC. So the correct
+    handling of a device timestamp that already represents local
+    wall-clock time is to store it AS-IS (naive, with no UTC conversion).
+
+    Previously this code ran the naive device time through
+    `device_tz.localize(...).astimezone(UTC)`, which shifted it by the
+    device timezone's UTC offset. That produced incorrect "pulled" times
+    on Employee Checkin (e.g. an actual 07:55 punch ending up showing as
+    07:21 or similar after the extra shift).
+
+    If a device's clock genuinely runs ahead/behind local time, configure
+    `clock_offset_minutes` on the Biometric Device to apply a fixed
+    correction. Defaults to 0 (no shift), which is correct for the
+    standard "device clock == local wall time" setup.
+    """
+    offset_minutes = cint(getattr(device_doc, "clock_offset_minutes", 0) or 0)
+    if offset_minutes:
+        return timestamp + timedelta(minutes=offset_minutes)
+    return timestamp
+
+
+def pull_attendance_from_device(device_doc, fetch_mode="New Records Only", progress_callback=None):
     """
     Pull attendance logs from a ZKTeco device.
     Returns list of dicts: {uid, user_id, timestamp, punch, status}
+
+    progress_callback(stage, current, total, message) is called (if provided)
+    at key points so the caller can surface live progress to the user.
     """
     conn = None
     zk = None
     records = []
 
+    def _progress(stage, current, total, message=""):
+        if progress_callback:
+            try:
+                progress_callback(stage, current, total, message)
+            except Exception:
+                pass
+
     try:
+        _progress("connecting", 0, 0, _("Connecting to device {0}...").format(device_doc.device_name))
         conn, zk = get_zk_connection(device_doc)
-        attendance_logs = conn.get_attendance()
+
+        _progress("fetching", 0, 0, _("Fetching attendance logs from device..."))
+        attendance_logs = conn.get_attendance() or []
+        total = len(attendance_logs)
+
+        _progress("fetched", 0, total, _("Fetched {0} raw record(s) from device.").format(total))
 
         if not attendance_logs:
             return records
 
-        tz_name = device_doc.time_zone or "UTC"
-        try:
-            device_tz = pytz.timezone(tz_name)
-        except pytz.UnknownTimeZoneError:
-            device_tz = pytz.UTC
-
-        for log in attendance_logs:
-            # Convert device local time → UTC-aware datetime
+        for idx, log in enumerate(attendance_logs, start=1):
+            # Device timestamps already represent local wall-clock time.
+            # Do NOT convert through UTC — store as-is (with optional
+            # fixed clock offset if configured on the device).
+            ts = log.timestamp
             try:
-                if hasattr(log.timestamp, 'tzinfo') and log.timestamp.tzinfo:
-                    utc_dt = log.timestamp.astimezone(pytz.UTC)
-                else:
-                    local_dt = device_tz.localize(log.timestamp)
-                    utc_dt = local_dt.astimezone(pytz.UTC)
+                ts = _adjust_for_clock_offset(ts, device_doc)
             except Exception:
-                utc_dt = log.timestamp
+                pass
 
             records.append({
                 "uid": log.uid,
                 "user_id": str(log.user_id),
-                "timestamp": utc_dt.replace(tzinfo=None),  # store naive UTC in Frappe
-                "punch": log.punch,      # 0=Check In, 1=Check Out, 4=OT In, 5=OT Out
+                "timestamp": ts,  # naive datetime, local wall-clock time
+                "punch": log.punch,      # 0=Check In, 1=Check Out, 2=Break Out, 3=Break In, 4=OT In, 5=OT Out
                 "status": log.status,
             })
+
+            if idx % 25 == 0 or idx == total:
+                _progress("processing_raw", idx, total, _("Read {0} of {1} record(s)...").format(idx, total))
 
         # Clear logs if configured
         if device_doc.clear_device_logs_after_sync:
@@ -171,8 +213,21 @@ def pull_attendance_from_device(device_doc, fetch_mode="New Records Only"):
 
 
 def get_punch_type(punch_code):
-    """Map ZKTeco punch codes to ERPNext check-in log types."""
-    # 0 = Check In, 1 = Check Out, 2 = Break Out, 3 = Break In, 4 = OT In, 5 = OT Out
+    """
+    Map ZKTeco punch codes to ERPNext check-in log types.
+    0 = Check In, 1 = Check Out, 2 = Break Out, 3 = Break In, 4 = OT In, 5 = OT Out
+
+    NOTE: Many ZKTeco devices/firmwares always send punch=0 for every
+    fingerprint/face punch regardless of whether it's an actual check-in
+    or check-out (the device has no concept of shift state). When that is
+    the case, `get_punch_type` alone is NOT enough to tell IN apart from
+    OUT — the sync engine resolves the final log_type per employee/day by
+    alternating IN/OUT in chronological order (see
+    `sync_engine.resolve_log_types_for_day`). This function still provides
+    the best first guess and is authoritative for explicit OT punches
+    (4/5), which are preserved as overtime log types when overtime
+    management is enabled.
+    """
     in_codes = {0, 4}
     out_codes = {1, 2, 3, 5}
 
@@ -182,3 +237,8 @@ def get_punch_type(punch_code):
         return "OUT"
     else:
         return "IN"  # default
+
+
+def is_overtime_punch(punch_code):
+    """Return True if the punch code represents an explicit OT In/Out punch."""
+    return punch_code in (4, 5)

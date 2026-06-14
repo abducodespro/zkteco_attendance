@@ -1,0 +1,42 @@
+{
+ "autoname": "ATT-SUM-.YYYY.-.#####",
+ "creation": "2024-01-01 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "company","column_break_1","from_date","to_date","status",
+  "section_settings","shift_type","col_break_settings","working_hours_method","missing_checkin_action",
+  "section_details","details",
+  "section_summary","total_employees","total_working_days","column_break_summary","total_overtime_hours"
+ ],
+ "fields": [
+  {"fieldname":"company","fieldtype":"Link","label":"Company","options":"Company","reqd":1,"in_list_view":1},
+  {"fieldname":"column_break_1","fieldtype":"Column Break"},
+  {"fieldname":"from_date","fieldtype":"Date","label":"From Date","reqd":1,"in_list_view":1},
+  {"fieldname":"to_date","fieldtype":"Date","label":"To Date","reqd":1,"in_list_view":1},
+  {"fieldname":"status","fieldtype":"Select","label":"Status","options":"Draft\nProcessing\nCompleted","default":"Draft","in_list_view":1,"read_only":1},
+  {"fieldname":"section_settings","fieldtype":"Section Break","label":"Processing Settings"},
+  {"fieldname":"shift_type","fieldtype":"Link","label":"Default Shift Type","options":"ZK Shift Type","description":"Fallback shift used when employee has no assignment"},
+  {"fieldname":"col_break_settings","fieldtype":"Column Break"},
+  {"fieldname":"working_hours_method","fieldtype":"Select","label":"Working Hours Method","options":"First IN - Last OUT\nActual Pairs (IN-OUT)","default":"First IN - Last OUT"},
+  {"fieldname":"missing_checkin_action","fieldtype":"Select","label":"Missing Check-In/Out Action","options":"Mark as Invalid\nMark as Present\nRequire Manual Review","default":"Mark as Invalid"},
+  {"fieldname":"section_details","fieldtype":"Section Break","label":"Employee Attendance Details"},
+  {"fieldname":"details","fieldtype":"Table","label":"Details","options":"Attendance Summary Detail"},
+  {"fieldname":"section_summary","fieldtype":"Section Break","label":"Summary"},
+  {"fieldname":"total_employees","fieldtype":"Int","label":"Total Employees","read_only":1},
+  {"fieldname":"total_working_days","fieldtype":"Int","label":"Working Days in Period","read_only":1},
+  {"fieldname":"column_break_summary","fieldtype":"Column Break"},
+  {"fieldname":"total_overtime_hours","fieldtype":"Float","label":"Total Overtime Hours","read_only":1}
+ ],
+ "links": [],
+ "module": "Zkteco Attendance",
+ "name": "Attendance Summary",
+ "permissions": [
+  {"create":1,"delete":1,"read":1,"write":1,"role":"System Manager"},
+  {"create":1,"delete":0,"read":1,"write":1,"role":"HR Manager"},
+  {"create":0,"delete":0,"read":1,"write":0,"role":"Biometric Device Manager"}
+ ],
+ "sort_field": "from_date",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

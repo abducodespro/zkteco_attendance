@@ -11,6 +11,8 @@ def after_install():
     _create_biometric_device_manager_role()
     _add_employee_biometric_field()
     _add_employee_checkin_device_field()
+    _add_employee_checkin_zk_uid_field()
+    _add_employee_checkin_overtime_field()
     frappe.db.commit()
     frappe.msgprint(_("ZKTeco Attendance installed successfully."))
 
@@ -43,7 +45,7 @@ def _add_employee_biometric_field():
         "label": "Biometric Attendance ID",
         "fieldname": "attendance_device_id",
         "fieldtype": "Data",
-        "insert_after": "attendance_device_id",
+        "insert_after": "employee_number",
         "description": "ID enrolled on the ZKTeco biometric device. Used to match attendance records.",
         "in_list_view": 0,
         "search_index": 1,
@@ -66,5 +68,46 @@ def _add_employee_checkin_device_field():
         "insert_after": "log_type",
         "description": "ZKTeco device that recorded this checkin.",
         "in_list_view": 0,
+    })
+    cf.insert(ignore_permissions=True)
+
+
+def _add_employee_checkin_zk_uid_field():
+    """Add zk_uid field to Employee Checkin (raw device record id, used for de-duplication)."""
+    if frappe.db.exists("Custom Field", {"dt": "Employee Checkin", "fieldname": "zk_uid"}):
+        return
+
+    cf = frappe.get_doc({
+        "doctype": "Custom Field",
+        "dt": "Employee Checkin",
+        "module": "Zkteco Attendance",
+        "label": "ZK Device Record ID",
+        "fieldname": "zk_uid",
+        "fieldtype": "Data",
+        "insert_after": "device_id",
+        "description": "Raw attendance record ID (uid) from the biometric device.",
+        "in_list_view": 0,
+        "read_only": 1,
+        "no_copy": 1,
+    })
+    cf.insert(ignore_permissions=True)
+
+
+def _add_employee_checkin_overtime_field():
+    """Add is_overtime checkbox to Employee Checkin for overtime punches (OT In/Out)."""
+    if frappe.db.exists("Custom Field", {"dt": "Employee Checkin", "fieldname": "is_overtime"}):
+        return
+
+    cf = frappe.get_doc({
+        "doctype": "Custom Field",
+        "dt": "Employee Checkin",
+        "module": "Zkteco Attendance",
+        "label": "Overtime Punch",
+        "fieldname": "is_overtime",
+        "fieldtype": "Check",
+        "insert_after": "zk_uid",
+        "description": "Set when this checkin was recorded as an Overtime In/Out punch (device punch code 4/5).",
+        "in_list_view": 1,
+        "no_copy": 1,
     })
     cf.insert(ignore_permissions=True)

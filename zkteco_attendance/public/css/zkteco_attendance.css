@@ -28,3 +28,20 @@
 .zkteco-stat-card.online  .stat-value { color: var(--green-500); }
 .zkteco-stat-card.offline .stat-value { color: var(--red-500); }
 .zkteco-stat-card.failed  .stat-value { color: var(--orange-500); }
+
+.zkteco-chart-card {
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 16px;
+    background: var(--card-bg);
+    margin-bottom: 16px;
+    min-height: 260px;
+}
+
+.zkteco-chart-card .chart-container {
+    overflow: visible;
+}
+
+.zkteco-pull-progress .progress {
+    background-color: var(--bg-color);
+}

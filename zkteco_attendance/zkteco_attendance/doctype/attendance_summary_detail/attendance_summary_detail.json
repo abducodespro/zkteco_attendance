@@ -1,0 +1,39 @@
+{
+ "creation": "2024-01-01 00:00:00",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "employee","employee_name","department","designation","column_break_1",
+  "working_days","absent_days","half_days","total_working_hours",
+  "absent_hours","overtime_hours","overtime_days","invalid_days","manual_review_days","remarks"
+ ],
+ "fields": [
+  {"fieldname":"employee","fieldtype":"Link","label":"Employee","options":"Employee",
+   "reqd":1,"in_list_view":1,"search_index":1,"columns":2},
+  {"fieldname":"employee_name","fieldtype":"Data","label":"Employee Name",
+   "fetch_from":"employee.employee_name","read_only":1,"in_list_view":1,"columns":2},
+  {"fieldname":"department","fieldtype":"Link","label":"Department","options":"Department",
+   "fetch_from":"employee.department","read_only":1,"in_list_view":1,"columns":2},
+  {"fieldname":"designation","fieldtype":"Link","label":"Designation","options":"Designation",
+   "fetch_from":"employee.designation","read_only":1},
+  {"fieldname":"column_break_1","fieldtype":"Column Break"},
+  {"fieldname":"working_days","fieldtype":"Float","label":"Working Days","read_only":1,"in_list_view":1,"columns":1},
+  {"fieldname":"absent_days","fieldtype":"Float","label":"Absent Days","read_only":1,"in_list_view":1,"columns":1},
+  {"fieldname":"half_days","fieldtype":"Float","label":"Half Days","read_only":1,"columns":1},
+  {"fieldname":"total_working_hours","fieldtype":"Float","label":"Total Hours","read_only":1,"in_list_view":1,"columns":1},
+  {"fieldname":"absent_hours","fieldtype":"Float","label":"Absent Hours","read_only":1,"columns":1},
+  {"fieldname":"overtime_hours","fieldtype":"Float","label":"Overtime Hours","read_only":1,"in_list_view":1,"columns":1},
+  {"fieldname":"overtime_days","fieldtype":"Int","label":"OT Days","read_only":1},
+  {"fieldname":"invalid_days","fieldtype":"Int","label":"Invalid Days","read_only":1},
+  {"fieldname":"manual_review_days","fieldtype":"Int","label":"Review Needed","read_only":1},
+  {"fieldname":"remarks","fieldtype":"Small Text","label":"Remarks"}
+ ],
+ "istable": 1,
+ "links": [],
+ "module": "Zkteco Attendance",
+ "name": "Attendance Summary Detail",
+ "permissions": [],
+ "sort_field": "employee_name",
+ "sort_order": "ASC"
+}

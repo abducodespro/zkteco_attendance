@@ -19,6 +19,93 @@ frappe.pages["zkteco-dashboard"].on_page_load = function (wrapper) {
         });
     });
 
+    page.add_inner_button(__("Refresh"), function () {
+        load_dashboard();
+    });
+
+    // Keep references to chart instances so we can destroy/recreate cleanly
+    const chartInstances = {};
+
+    function destroy_charts() {
+        Object.keys(chartInstances).forEach((key) => {
+            const inst = chartInstances[key];
+            if (inst && typeof inst.destroy === "function") {
+                try { inst.destroy(); } catch (e) { /* ignore */ }
+            }
+            delete chartInstances[key];
+        });
+    }
+
+    function render_charts(charts) {
+        if (!charts) return;
+
+        // 1. Check-ins over the last 7 days (line/bar)
+        if (charts.checkins_last_7_days && $(wrapper).find("#zkteco-chart-checkins").length) {
+            chartInstances.checkins = new frappe.Chart("#zkteco-chart-checkins", {
+                title: __("Check-ins (Last 7 Days)"),
+                data: {
+                    labels: charts.checkins_last_7_days.labels,
+                    datasets: [
+                        { name: __("Check-ins"), values: charts.checkins_last_7_days.values },
+                    ],
+                },
+                type: "bar",
+                height: 220,
+                colors: ["#5e64ff"],
+                axisOptions: { xIsSeries: 1 },
+            });
+        }
+
+        // 2. Sync results over the last 7 days (stacked-ish bar via multiple datasets)
+        if (charts.sync_results_last_7_days && $(wrapper).find("#zkteco-chart-syncs").length) {
+            const s = charts.sync_results_last_7_days;
+            chartInstances.syncs = new frappe.Chart("#zkteco-chart-syncs", {
+                title: __("Sync Results (Last 7 Days)"),
+                data: {
+                    labels: s.labels,
+                    datasets: [
+                        { name: __("New"), values: s.new },
+                        { name: __("Duplicate"), values: s.duplicate },
+                        { name: __("Failed"), values: s.failed },
+                    ],
+                },
+                type: "bar",
+                height: 220,
+                colors: ["#28a745", "#ffc107", "#dc3545"],
+                axisOptions: { xIsSeries: 1 },
+                barOptions: { stacked: 1 },
+            });
+        }
+
+        // 3. Device status (donut)
+        if (charts.device_status && $(wrapper).find("#zkteco-chart-devices").length) {
+            chartInstances.devices = new frappe.Chart("#zkteco-chart-devices", {
+                title: __("Device Status"),
+                data: {
+                    labels: charts.device_status.labels,
+                    datasets: [{ values: charts.device_status.values }],
+                },
+                type: "donut",
+                height: 220,
+                colors: ["#28a745", "#dc3545"],
+            });
+        }
+
+        // 4. Today's punch breakdown (donut: IN / OUT / Overtime)
+        if (charts.todays_punch_breakdown && $(wrapper).find("#zkteco-chart-punches").length) {
+            chartInstances.punches = new frappe.Chart("#zkteco-chart-punches", {
+                title: __("Today's Check-ins by Type"),
+                data: {
+                    labels: charts.todays_punch_breakdown.labels,
+                    datasets: [{ values: charts.todays_punch_breakdown.values }],
+                },
+                type: "donut",
+                height: 220,
+                colors: ["#5e64ff", "#ff5858", "#ffa00a"],
+            });
+        }
+    }
+
     function load_dashboard() {
         frappe.call({
             method: "zkteco_attendance.zkteco_attendance.page.zkteco_dashboard.zkteco_dashboard.get_data",
@@ -26,6 +113,7 @@ frappe.pages["zkteco-dashboard"].on_page_load = function (wrapper) {
                 if (!r.message) return;
                 const d = r.message;
 
+                destroy_charts();
                 $(wrapper).find(".zkteco-dashboard").remove();
 
                 const html = `
@@ -72,14 +160,45 @@ frappe.pages["zkteco-dashboard"].on_page_load = function (wrapper) {
                             </div>
                         </div>
                     </div>
+
+                    <div class="row" style="margin-top:24px">
+                        <div class="col-sm-6">
+                            <div class="zkteco-chart-card">
+                                <div id="zkteco-chart-checkins"></div>
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="zkteco-chart-card">
+                                <div id="zkteco-chart-syncs"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row" style="margin-top:16px">
+                        <div class="col-sm-6">
+                            <div class="zkteco-chart-card">
+                                <div id="zkteco-chart-devices"></div>
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="zkteco-chart-card">
+                                <div id="zkteco-chart-punches"></div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div style="margin-top:24px">
                         <a class="btn btn-default btn-sm" href="/app/biometric-device">${__("Manage Devices")}</a>
                         &nbsp;
                         <a class="btn btn-default btn-sm" href="/app/attendance-sync-log">${__("View Sync Logs")}</a>
+                        &nbsp;
+                        <a class="btn btn-default btn-sm" href="/app/attendance-summary">${__("Attendance Summary")}</a>
                     </div>
                 </div>`;
 
                 $(wrapper).find(".layout-main-section").append(html);
+
+                // frappe.Chart needs the container to exist in the DOM first
+                render_charts(d.charts);
             },
         });
     }
