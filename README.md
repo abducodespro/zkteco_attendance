@@ -9,12 +9,20 @@ and v16.
 
 ## 1. Installation
 
+## Fresh install
 ```bash
-bench get-app zkteco_attendance <repo-url-or-path>
-bench --site yoursite.local install-app zkteco_attendance
-bench --site yoursite.local migrate
+bench get-app https://github.com/abducodespro/zkteco_attendance --skip-assets
+echo "zkteco_attendance" >> ~/frappe-bench/sites/apps.txt
+bench --site frappe.com install-app zkteco_attendance
+bench --site frappe.com migrate
 bench build --app zkteco_attendance
-bench restart
+bench start
+```
+## Clean up if needed
+```bash
+bench --site frappe.com uninstall-app zkteco_attendance 2>/dev/null; true
+rm -rf ~/frappe-bench/apps/zkteco_attendance
+sed -i '/zkteco_attendance/d' ~/frappe-bench/sites/apps.txt
 ```
 
 Make sure the `pyzk` Python library is available (used to talk to the
