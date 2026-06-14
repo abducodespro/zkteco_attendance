@@ -9,8 +9,8 @@ from frappe import _
 def after_install():
     """Run after app is installed via bench install-app."""
     _create_biometric_device_manager_role()
-    _add_employee_biometric_field()
-    _add_employee_checkin_device_field()
+    # _add_employee_biometric_field()
+    # _add_employee_checkin_device_field()
     _add_employee_checkin_zk_uid_field()
     _add_employee_checkin_overtime_field()
     frappe.db.commit()
