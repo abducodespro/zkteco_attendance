@@ -6,9 +6,9 @@
  "field_order": [
   "shift_name","color","column_break_1","company","is_active",
   "section_timing","start_time","end_time","is_night_shift",
-  "column_hours","full_day_hours","half_day_hours","standard_working_hours",
+  "section_hours","full_day_hours","half_day_hours","standard_working_hours",
   "section_calc","working_hours_method","missing_checkin_action",
-  "column_grace","late_entry_grace","early_exit_grace",
+  "section_grace","late_entry_grace","early_exit_grace",
   "section_overtime","enable_overtime","overtime_calculation_method",
   "overtime_threshold_minutes","column_break_ot","overtime_rate_multiplier",
   "max_overtime_hours_per_day",
