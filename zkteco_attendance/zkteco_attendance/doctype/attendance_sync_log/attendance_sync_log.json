@@ -18,6 +18,7 @@
   "duplicate_records",
   "failed_records",
   "overtime_records",
+  "double_punch_records",
   "section_errors",
   "error_details"
  ],
@@ -93,6 +94,12 @@
    "fieldname": "overtime_records",
    "fieldtype": "Int",
    "label": "Overtime Records"
+  },
+  {
+   "default": "0",
+   "fieldname": "double_punch_records",
+   "fieldtype": "Int",
+   "label": "Double Punch Records"
   },
   {
    "fieldname": "section_errors",

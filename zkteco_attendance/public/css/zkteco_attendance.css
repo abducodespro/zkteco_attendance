@@ -83,3 +83,18 @@
     background: var(--orange-50);
     color: var(--orange-700);
 }
+
+/* Manually edited/added indicator */
+.zk-manual-badge {
+    display: inline-block;
+    font-size: 0.75rem;
+    color: var(--blue-500);
+    margin-left: 3px;
+    vertical-align: middle;
+    cursor: help;
+}
+
+/* Saturday row subtle highlight */
+.zk-daily-table tr td:first-child .text-muted {
+    font-size: 0.68rem;
+}

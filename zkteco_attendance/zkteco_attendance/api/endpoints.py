@@ -141,22 +141,51 @@ def get_latest_sync_log(device_name):
 
 
 @frappe.whitelist()
-def get_daily_checkins(attendance_summary):
+def get_daily_checkins(attendance_summary=None, from_date=None, to_date=None,
+                       employee_list=None, company=None):
     """
-    Return per-employee, per-day checkin breakdown for the Daily Checkins
-    dashboard, sourced from an Attendance Summary's From Date / To Date /
-    Employee list.
+    Return per-employee, per-day checkin breakdown.
+    Accepts either an Attendance Summary name OR a direct date range + employee list.
     """
     frappe.only_for(["System Manager", "HR Manager", "Biometric Device Manager"])
 
-    if not attendance_summary:
-        frappe.throw(_("Attendance Summary is required."))
-
-    if not frappe.db.exists("Attendance Summary", attendance_summary):
-        frappe.throw(_("Attendance Summary {0} not found.").format(attendance_summary))
-
     from zkteco_attendance.zkteco_attendance.attendance_processor import get_daily_checkins_data
-    return get_daily_checkins_data(attendance_summary)
+
+    if not attendance_summary and not (from_date and to_date):
+        frappe.throw(_("Either Attendance Summary or From Date + To Date are required."))
+
+    # employee_list may come as JSON string from JS
+    if employee_list and isinstance(employee_list, str):
+        import json as _json
+        try:
+            employee_list = _json.loads(employee_list)
+        except Exception:
+            employee_list = [e.strip() for e in employee_list.split(",") if e.strip()]
+
+    return get_daily_checkins_data(
+        attendance_summary=attendance_summary,
+        from_date=from_date,
+        to_date=to_date,
+        employee_list=employee_list or None,
+        company=company,
+    )
+
+
+@frappe.whitelist()
+def save_manual_checkin(attendance_summary, employee, checkin_time, log_type,
+                        checkin_name=None):
+    """
+    Add or update an Employee Checkin manually from the Daily Checkins dashboard.
+    Records edited_by / edited_at for audit trail.
+    """
+    frappe.only_for(["System Manager", "HR Manager", "Biometric Device Manager"])
+    doc = frappe.get_doc("Attendance Summary", attendance_summary)
+    return doc.save_manual_checkin(
+        employee=employee,
+        checkin_time=checkin_time,
+        log_type=log_type,
+        checkin_name=checkin_name,
+    )
 
 
 @frappe.whitelist()

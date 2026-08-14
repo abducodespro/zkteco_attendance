@@ -11,6 +11,7 @@ and v16.
 
 ### Fresh install
 ```bash
+cd frappe-bench
 bench get-app https://github.com/abducodespro/zkteco_attendance --skip-assets
 bench --site frappe.com install-app zkteco_attendance
 bench --site frappe.com migrate
@@ -42,7 +43,7 @@ Installation automatically:
 ## 2. Initial Setup
 
 ### 2.1 Map employees to the device
-On each **Employee** record, fill in **Biometric Attendance ID** — this
+On each **Employee** record, fill in **Biometric Device ID** and **Biometric Attendance ID** — this
 must match the User ID/Badge Number enrolled on the ZKTeco device for that
 person.
 

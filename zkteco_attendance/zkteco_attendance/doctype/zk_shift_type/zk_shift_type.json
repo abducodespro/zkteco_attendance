@@ -4,56 +4,304 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "shift_name","color","column_break_1","company","is_active",
-  "section_timing","start_time","end_time","is_night_shift",
-  "section_hours","full_day_hours","half_day_hours","standard_working_hours",
-  "section_calc","working_hours_method","missing_checkin_action",
-  "section_grace","late_entry_grace","early_exit_grace",
-  "section_overtime","enable_overtime","overtime_calculation_method",
-  "overtime_threshold_minutes","column_break_ot","overtime_rate_multiplier",
+  "shift_name",
+  "color",
+  "column_break_1",
+  "company",
+  "is_active",
+  "section_timing",
+  "start_time",
+  "end_time",
+  "is_night_shift",
+  "column_hours",
+  "full_day_hours",
+  "half_day_hours",
+  "standard_working_hours",
+  "section_calc",
+  "working_hours_method",
+  "missing_checkin_action",
+  "column_grace",
+  "late_entry_grace",
+  "early_exit_grace",
+  "section_overtime",
+  "enable_overtime",
+  "overtime_calculation_method",
+  "overtime_threshold_minutes",
+  "column_break_ot",
+  "overtime_rate_multiplier",
   "max_overtime_hours_per_day",
-  "section_notes","description"
+  "column_break_ot2",
+  "day_overtime_rate",
+  "night_overtime_rate",
+  "section_ot_window",
+  "standard_start_time",
+  "column_break_ot3",
+  "night_ot_start_time",
+  "night_ot_end_time",
+  "section_saturday",
+  "saturday_mode",
+  "column_break_sat",
+  "saturday_half_day_hours",
+  "section_notes",
+  "description"
  ],
  "fields": [
-  {"fieldname":"shift_name","fieldtype":"Data","label":"Shift Name","reqd":1,"unique":1,"in_list_view":1},
-  {"fieldname":"color","fieldtype":"Color","label":"Color","default":"#2490ef"},
-  {"fieldname":"column_break_1","fieldtype":"Column Break"},
-  {"fieldname":"company","fieldtype":"Link","label":"Company","options":"Company","reqd":1},
-  {"fieldname":"is_active","fieldtype":"Check","label":"Active","default":"1","in_list_view":1},
-  {"fieldname":"section_timing","fieldtype":"Section Break","label":"Timing"},
-  {"fieldname":"start_time","fieldtype":"Time","label":"Start Time","reqd":1,"in_list_view":1},
-  {"fieldname":"end_time","fieldtype":"Time","label":"End Time","reqd":1,"in_list_view":1},
-  {"fieldname":"is_night_shift","fieldtype":"Check","label":"Night Shift (crosses midnight)","default":"0"},
-  {"fieldname":"column_hours","fieldtype":"Column Break","label":"Hour Thresholds", "bold":1},
-  {"fieldname":"full_day_hours","fieldtype":"Float","label":"Full Day Minimum Hours","default":"8","reqd":1},
-  {"fieldname":"half_day_hours","fieldtype":"Float","label":"Half Day Minimum Hours","default":"4","reqd":1},
-  {"fieldname":"standard_working_hours","fieldtype":"Float","label":"Standard Daily Hours (for absent calc)","default":"8","reqd":1},
-  {"fieldname":"section_calc","fieldtype":"Section Break","label":"Calculation Rules"},
-  {"fieldname":"working_hours_method","fieldtype":"Select","label":"Working Hours Method",
-   "options":"First IN - Last OUT\nActual Pairs (IN-OUT)","default":"First IN - Last OUT"},
-  {"fieldname":"missing_checkin_action","fieldtype":"Select","label":"Missing Check-In/Out Action",
-   "options":"Mark as Invalid\nMark as Present\nRequire Manual Review","default":"Mark as Invalid"},
-  {"fieldname":"column_grace","fieldtype":"Column Break","label":"Grace Periods", "bold": 1},
-  {"fieldname":"late_entry_grace","fieldtype":"Int","label":"Late Entry Grace (minutes)","default":"0"},
-  {"fieldname":"early_exit_grace","fieldtype":"Int","label":"Early Exit Grace (minutes)","default":"0"},
-  {"fieldname":"section_overtime","fieldtype":"Section Break","label":"Overtime Management"},
-  {"fieldname":"enable_overtime","fieldtype":"Check","label":"Enable Overtime Calculation","default":"0"},
-  {"fieldname":"overtime_calculation_method","fieldtype":"Select","label":"Overtime Calculation Method",
-   "options":"After Standard Hours\nAfter Shift End Time\nOT Punches Only","default":"After Standard Hours",
-   "depends_on":"eval:doc.enable_overtime",
-   "description":"After Standard Hours: any working hours beyond Standard Daily Hours count as OT.\nAfter Shift End Time: time worked past the shift's End Time counts as OT.\nOT Punches Only: only explicit device OT In/OT Out punches (code 4/5) are counted as OT."},
-  {"fieldname":"overtime_threshold_minutes","fieldtype":"Int","label":"OT Threshold (minutes)","default":"0",
-   "depends_on":"eval:doc.enable_overtime",
-   "description":"Minimum extra minutes worked before overtime is counted (avoids paying OT for a few minutes of rounding)."},
-  {"fieldname":"column_break_ot","fieldtype":"Column Break"},
-  {"fieldname":"overtime_rate_multiplier","fieldtype":"Float","label":"Overtime Rate Multiplier","default":"1.5",
-   "depends_on":"eval:doc.enable_overtime",
-   "description":"Used for reference only — actual OT pay rules are configured in Payroll."},
-  {"fieldname":"max_overtime_hours_per_day","fieldtype":"Float","label":"Max OT Hours per Day","default":"0",
-   "depends_on":"eval:doc.enable_overtime",
-   "description":"0 = no cap. Overtime hours beyond this cap are recorded but not paid."},
-  {"fieldname":"section_notes","fieldtype":"Section Break","label":"Notes"},
-  {"fieldname":"description","fieldtype":"Small Text","label":"Description"}
+  {
+   "fieldname": "shift_name",
+   "fieldtype": "Data",
+   "label": "Shift Name",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "color",
+   "fieldtype": "Color",
+   "label": "Color",
+   "default": "#2490ef"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "label": "Active",
+   "default": "1",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "section_timing",
+   "fieldtype": "Section Break",
+   "label": "Timing"
+  },
+  {
+   "fieldname": "start_time",
+   "fieldtype": "Time",
+   "label": "Start Time",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "end_time",
+   "fieldtype": "Time",
+   "label": "End Time",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "is_night_shift",
+   "fieldtype": "Check",
+   "label": "Night Shift (crosses midnight)",
+   "default": "0"
+  },
+  {
+   "fieldname": "column_hours",
+   "fieldtype": "Column Break",
+   "label": "Hour Thresholds",
+   "bold": 1
+  },
+  {
+   "fieldname": "full_day_hours",
+   "fieldtype": "Float",
+   "label": "Full Day Minimum Hours",
+   "default": "8",
+   "reqd": 1
+  },
+  {
+   "fieldname": "half_day_hours",
+   "fieldtype": "Float",
+   "label": "Half Day Minimum Hours",
+   "default": "4",
+   "reqd": 1
+  },
+  {
+   "fieldname": "standard_working_hours",
+   "fieldtype": "Float",
+   "label": "Standard Daily Hours (for absent calc)",
+   "default": "8",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_calc",
+   "fieldtype": "Section Break",
+   "label": "Calculation Rules"
+  },
+  {
+   "fieldname": "working_hours_method",
+   "fieldtype": "Select",
+   "label": "Working Hours Method",
+   "options": "First IN - Last OUT\nActual Pairs (IN-OUT)",
+   "default": "First IN - Last OUT"
+  },
+  {
+   "fieldname": "missing_checkin_action",
+   "fieldtype": "Select",
+   "label": "Missing Check-In/Out Action",
+   "options": "Mark as Invalid\nMark as Present\nRequire Manual Review",
+   "default": "Mark as Invalid"
+  },
+  {
+   "fieldname": "column_grace",
+   "fieldtype": "Column Break",
+   "label": "Grace Periods",
+   "bold": 1
+  },
+  {
+   "fieldname": "late_entry_grace",
+   "fieldtype": "Int",
+   "label": "Late Entry Grace (minutes)",
+   "default": "0"
+  },
+  {
+   "fieldname": "early_exit_grace",
+   "fieldtype": "Int",
+   "label": "Early Exit Grace (minutes)",
+   "default": "0"
+  },
+  {
+   "fieldname": "section_overtime",
+   "fieldtype": "Section Break",
+   "label": "Overtime Management"
+  },
+  {
+   "fieldname": "enable_overtime",
+   "fieldtype": "Check",
+   "label": "Enable Overtime Calculation",
+   "default": "0"
+  },
+  {
+   "fieldname": "overtime_calculation_method",
+   "fieldtype": "Select",
+   "label": "Overtime Calculation Method",
+   "options": "After Standard Hours\nAfter Shift End Time\nOT Punches Only",
+   "default": "After Standard Hours",
+   "depends_on": "eval:doc.enable_overtime",
+   "description": "After Standard Hours: any working hours beyond Standard Daily Hours count as OT.\nAfter Shift End Time: time worked past the shift's End Time counts as OT.\nOT Punches Only: only explicit device OT In/OT Out punches (code 4/5) are counted as OT."
+  },
+  {
+   "fieldname": "overtime_threshold_minutes",
+   "fieldtype": "Int",
+   "label": "OT Threshold (minutes)",
+   "default": "0",
+   "depends_on": "eval:doc.enable_overtime",
+   "description": "Minimum extra minutes worked before overtime is counted (avoids paying OT for a few minutes of rounding)."
+  },
+  {
+   "fieldname": "column_break_ot",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "overtime_rate_multiplier",
+   "fieldtype": "Float",
+   "label": "Overtime Rate Multiplier",
+   "default": "1.5",
+   "depends_on": "eval:doc.enable_overtime",
+   "description": "Used for reference only \u2014 actual OT pay rules are configured in Payroll."
+  },
+  {
+   "fieldname": "max_overtime_hours_per_day",
+   "fieldtype": "Float",
+   "label": "Max OT Hours per Day",
+   "default": "0",
+   "depends_on": "eval:doc.enable_overtime",
+   "description": "0 = no cap. Overtime hours beyond this cap are recorded but not paid."
+  },
+  {
+   "fieldname": "column_break_ot2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "day_overtime_rate",
+   "fieldtype": "Float",
+   "label": "Day OT Rate Multiplier",
+   "default": "1.5",
+   "depends_on": "eval:doc.enable_overtime",
+   "description": "Rate for daytime overtime hours (e.g. 1.5x). Applied to hours worked before the standard shift start time."
+  },
+  {
+   "fieldname": "night_overtime_rate",
+   "fieldtype": "Float",
+   "label": "Night OT Rate Multiplier",
+   "default": "1.75",
+   "depends_on": "eval:doc.enable_overtime",
+   "description": "Rate for night/late overtime hours (e.g. 1.75x). Applied to hours worked after the standard shift ends into night."
+  },
+  {
+   "fieldname": "section_ot_window",
+   "fieldtype": "Section Break",
+   "label": "Overtime Time Windows",
+   "depends_on": "eval:doc.enable_overtime",
+   "description": "Define which clock hours count as Day OT vs Night OT. Example: Guards shift 17:00-06:00 \u2014 standard ends at 01:00 (8 hrs), Night OT window 01:00-06:00 (5 hrs at 1.75x). Day shift 06:00-17:00 \u2014 Day OT window 06:00-08:00 (2 hrs at 1.5x, pre-standard start)."
+  },
+  {
+   "fieldname": "standard_start_time",
+   "fieldtype": "Time",
+   "label": "Standard Shift Core Start",
+   "depends_on": "eval:doc.enable_overtime",
+   "description": "The time when standard (non-OT) hours begin. Hours worked before this time on a day shift count as Day OT."
+  },
+  {
+   "fieldname": "column_break_ot3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "night_ot_start_time",
+   "fieldtype": "Time",
+   "label": "Night OT Start Time",
+   "depends_on": "eval:doc.enable_overtime",
+   "description": "The time after which night overtime begins on a night shift (e.g. 01:00 for a guard starting at 17:00 who hits 8 std hrs at 01:00)."
+  },
+  {
+   "fieldname": "night_ot_end_time",
+   "fieldtype": "Time",
+   "label": "Night OT End Time",
+   "depends_on": "eval:doc.enable_overtime",
+   "description": "The checkout time that marks the end of night OT (e.g. 06:00). Hours between Night OT Start and this time count as night OT."
+  },
+  {
+   "fieldname": "section_saturday",
+   "fieldtype": "Section Break",
+   "label": "Saturday Configuration"
+  },
+  {
+   "fieldname": "saturday_mode",
+   "fieldtype": "Select",
+   "label": "Saturday Working Mode",
+   "options": "Full Day\nHalf Day\nOff",
+   "default": "Full Day",
+   "description": "Controls how Saturday hours are counted: Full Day uses normal thresholds, Half Day counts Saturday as 0.5 day, Off skips Saturday entirely."
+  },
+  {
+   "fieldname": "column_break_sat",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "saturday_half_day_hours",
+   "fieldtype": "Float",
+   "label": "Saturday Half Day Min Hours",
+   "default": "4",
+   "depends_on": "eval:doc.saturday_mode=='Half Day'",
+   "description": "Minimum hours for Saturday to count as Half Day (when Saturday Mode is Half Day)."
+  },
+  {
+   "fieldname": "section_notes",
+   "fieldtype": "Section Break",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  }
  ],
  "links": [],
  "modified": "2024-01-01 00:00:00.000000",
@@ -63,9 +311,27 @@
  "name": "ZK Shift Type",
  "naming_rule": "By fieldname",
  "permissions": [
-  {"create":1,"delete":1,"read":1,"write":1,"role":"System Manager"},
-  {"create":1,"delete":0,"read":1,"write":1,"role":"HR Manager"},
-  {"create":1,"delete":0,"read":1,"write":1,"role":"Biometric Device Manager"}
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "write": 1,
+   "role": "System Manager"
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "read": 1,
+   "write": 1,
+   "role": "HR Manager"
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "read": 1,
+   "write": 1,
+   "role": "Biometric Device Manager"
+  }
  ],
  "sort_field": "shift_name",
  "sort_order": "ASC",

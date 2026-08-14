@@ -52,6 +52,11 @@ frappe.ui.form.on("Attendance Summary", {
             frm.add_custom_button(__("View Daily Checkins"), function () {
                 frappe.set_route("zk-daily-checkins", frm.doc.name);
             }, __("View"));
+
+            // ── Add Manual Check-in ────────────────────────────────────────
+            frm.add_custom_button(__("Add Check-in"), function () {
+                frm.trigger("show_manual_checkin_dialog");
+            }, __("Actions"));
         }
 
         // ── Overtime summary indicator ─────────────────────────────────────
@@ -87,6 +92,86 @@ frappe.ui.form.on("Attendance Summary", {
                 }
             });
         }, 4000);
+    },
+
+    show_manual_checkin_dialog(frm) {
+        const employee_options = (frm.doc.details || []).map(r =>
+            `${r.employee} — ${r.employee_name || ""}`
+        );
+        const employee_map = {};
+        (frm.doc.details || []).forEach(r => { employee_map[r.employee] = r.employee_name; });
+        const emp_keys = Object.keys(employee_map);
+
+        const d = new frappe.ui.Dialog({
+            title: __("Add Manual Check-in"),
+            fields: [
+                {
+                    fieldtype: "Link",
+                    fieldname: "employee",
+                    label: __("Employee"),
+                    options: "Employee",
+                    get_query() {
+                        return { filters: { name: ["in", emp_keys] } };
+                    },
+                    reqd: 1,
+                },
+                { fieldtype: "Column Break" },
+                {
+                    fieldtype: "Select",
+                    fieldname: "log_type",
+                    label: __("Log Type"),
+                    options: "IN\nOUT",
+                    default: "IN",
+                    reqd: 1,
+                },
+                { fieldtype: "Section Break" },
+                {
+                    fieldtype: "Date",
+                    fieldname: "checkin_date",
+                    label: __("Date"),
+                    default: frm.doc.from_date,
+                    reqd: 1,
+                },
+                { fieldtype: "Column Break" },
+                {
+                    fieldtype: "Time",
+                    fieldname: "checkin_time",
+                    label: __("Time"),
+                    default: "08:00:00",
+                    reqd: 1,
+                },
+            ],
+            primary_action_label: __("Save Check-in"),
+            primary_action(vals) {
+                if (!vals.employee || !vals.checkin_date || !vals.checkin_time) {
+                    frappe.msgprint(__("All fields are required."));
+                    return;
+                }
+                const checkin_time = vals.checkin_date + " " + vals.checkin_time;
+                frm.call({
+                    doc: frm.doc,
+                    method: "save_manual_checkin",
+                    args: {
+                        employee:     vals.employee,
+                        checkin_time: checkin_time,
+                        log_type:     vals.log_type,
+                    },
+                    freeze: true,
+                    freeze_message: __("Saving check-in…"),
+                    callback(r) {
+                        d.hide();
+                        if (r.message) {
+                            frappe.show_alert({
+                                message: __("Check-in {0} for {1} at {2}.",
+                                    [r.message.action, vals.employee, checkin_time]),
+                                indicator: "green",
+                            }, 6);
+                        }
+                    },
+                });
+            },
+        });
+        d.show();
     },
 
     show_fetch_dialog(frm) {

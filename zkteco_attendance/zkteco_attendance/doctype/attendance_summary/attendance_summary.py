@@ -36,6 +36,56 @@ class AttendanceSummary(Document):
         )
     
 
+    @frappe.whitelist()
+    def save_manual_checkin(self, employee, checkin_time, log_type, checkin_name=None):
+        """
+        Add a new Employee Checkin or update an existing one manually.
+        Saves edited_by / edited_at / manually_edited flags.
+        Called from the Daily Checkins dashboard (and optionally from here).
+        Returns the created/updated checkin name.
+        """
+        from frappe.utils import now_datetime as _now
+
+        if not employee or not checkin_time or not log_type:
+            frappe.throw(_("Employee, Check-in Time, and Log Type are required."))
+
+        # Validate employee belongs to this summary
+        emp_names = [row.employee for row in self.details]
+        if employee not in emp_names:
+            frappe.throw(_("Employee {0} is not part of this Attendance Summary.").format(employee))
+
+        editor = frappe.session.user
+        now    = _now()
+
+        if checkin_name and frappe.db.exists("Employee Checkin", checkin_name):
+            # Update existing
+            doc = frappe.get_doc("Employee Checkin", checkin_name)
+            doc.time            = checkin_time
+            doc.log_type        = log_type
+            doc.manually_edited = 1
+            doc.edited_by       = editor
+            doc.edited_at       = now
+            doc.save(ignore_permissions=True)
+            frappe.db.commit()
+            return {"name": doc.name, "action": "updated"}
+        else:
+            # Create new
+            emp_doc = frappe.db.get_value("Employee", employee,
+                                          ["employee_name"], as_dict=True)
+            doc = frappe.get_doc({
+                "doctype":        "Employee Checkin",
+                "employee":       employee,
+                "employee_name":  emp_doc.employee_name if emp_doc else employee,
+                "time":           checkin_time,
+                "log_type":       log_type,
+                "manually_edited": 1,
+                "edited_by":      editor,
+                "edited_at":      now,
+            })
+            doc.insert(ignore_permissions=True)
+            frappe.db.commit()
+            return {"name": doc.name, "action": "created"}
+
     # ── called by JS "Process Attendance" ────────────────────────────────────
     @frappe.whitelist()
     def process_attendance(self):
@@ -91,6 +141,8 @@ def _process_background(summary_name):
         row.total_working_hours = result["total_working_hours"]
         row.absent_hours        = result["absent_hours"]
         row.overtime_hours      = result["overtime_hours"]
+        row.day_ot_hours        = result.get("day_ot_hours", 0.0)
+        row.night_ot_hours      = result.get("night_ot_hours", 0.0)
         row.overtime_days       = result["overtime_days"]
         row.invalid_days        = result["invalid_days"]
         row.manual_review_days  = result["manual_review_days"]

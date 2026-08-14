@@ -129,8 +129,11 @@ frappe.ui.form.on("Biometric Device", {
                             <td>${__("Failed")}</td><td class="text-right text-danger zkteco-cnt-failed">0</td>
                         </tr>
                         <tr>
+                            <td>${__("Double Punches")}</td><td class="text-right text-muted zkteco-cnt-dp">0</td>
                             <td>${__("Overtime Punches")}</td><td class="text-right text-warning zkteco-cnt-ot">0</td>
-                            <td>${__("Status")}</td><td class="text-right zkteco-cnt-status">—</td>
+                        </tr>
+                        <tr>
+                            <td colspan="2">${__("Status")}</td><td colspan="2" class="text-right zkteco-cnt-status">—</td>
                         </tr>
                     </table>
                 </div>
@@ -174,6 +177,11 @@ frappe.ui.form.on("Biometric Device", {
                 case "filtered":
                     setProgress(55, data.message);
                     break;
+                case "deduped":
+                    setProgress(55, data.message);
+                    $counts.show();
+                    $body.find(".zkteco-cnt-dp").text(data.double_punches ?? 0);
+                    break;
                 case "creating_checkins": {
                     const pct = data.total ? 55 + (data.current / data.total) * 40 : 55;
                     setProgress(pct, data.message);
@@ -182,6 +190,7 @@ frappe.ui.form.on("Biometric Device", {
                     $body.find(".zkteco-cnt-dupes").text(data.duplicates ?? 0);
                     $body.find(".zkteco-cnt-failed").text(data.failed ?? 0);
                     $body.find(".zkteco-cnt-ot").text(data.overtime_records ?? 0);
+                    $body.find(".zkteco-cnt-dp").text(data.double_punches ?? 0);
                     $body.find(".zkteco-cnt-total").text(data.total ?? 0);
                     break;
                 }
@@ -234,6 +243,7 @@ frappe.ui.form.on("Biometric Device", {
                 $body.find(".zkteco-cnt-dupes").text(res.duplicates ?? 0);
                 $body.find(".zkteco-cnt-failed").text(res.failed ?? 0);
                 $body.find(".zkteco-cnt-ot").text(res.overtime_records ?? 0);
+                $body.find(".zkteco-cnt-dp").text(res.double_punches ?? 0);
 
                 const statusColors = { Success: "text-success", Partial: "text-warning", Failed: "text-danger" };
                 $body.find(".zkteco-cnt-status")
