@@ -10,6 +10,7 @@ from zkteco_attendance.zkteco_attendance.attendance_processor import (
     count_working_days,
     fetch_checkins,
     process_employee,
+    save_manual_checkin_record,
 )
 
 
@@ -44,8 +45,6 @@ class AttendanceSummary(Document):
         Called from the Daily Checkins dashboard (and optionally from here).
         Returns the created/updated checkin name.
         """
-        from frappe.utils import now_datetime as _now
-
         if not employee or not checkin_time or not log_type:
             frappe.throw(_("Employee, Check-in Time, and Log Type are required."))
 
@@ -54,37 +53,12 @@ class AttendanceSummary(Document):
         if employee not in emp_names:
             frappe.throw(_("Employee {0} is not part of this Attendance Summary.").format(employee))
 
-        editor = frappe.session.user
-        now    = _now()
-
-        if checkin_name and frappe.db.exists("Employee Checkin", checkin_name):
-            # Update existing
-            doc = frappe.get_doc("Employee Checkin", checkin_name)
-            doc.time            = checkin_time
-            doc.log_type        = log_type
-            doc.manually_edited = 1
-            doc.edited_by       = editor
-            doc.edited_at       = now
-            doc.save(ignore_permissions=True)
-            frappe.db.commit()
-            return {"name": doc.name, "action": "updated"}
-        else:
-            # Create new
-            emp_doc = frappe.db.get_value("Employee", employee,
-                                          ["employee_name"], as_dict=True)
-            doc = frappe.get_doc({
-                "doctype":        "Employee Checkin",
-                "employee":       employee,
-                "employee_name":  emp_doc.employee_name if emp_doc else employee,
-                "time":           checkin_time,
-                "log_type":       log_type,
-                "manually_edited": 1,
-                "edited_by":      editor,
-                "edited_at":      now,
-            })
-            doc.insert(ignore_permissions=True)
-            frappe.db.commit()
-            return {"name": doc.name, "action": "created"}
+        return save_manual_checkin_record(
+            employee=employee,
+            checkin_time=checkin_time,
+            log_type=log_type,
+            checkin_name=checkin_name,
+        )
 
     # ── called by JS "Process Attendance" ────────────────────────────────────
     @frappe.whitelist()

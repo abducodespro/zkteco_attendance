@@ -172,15 +172,29 @@ def get_daily_checkins(attendance_summary=None, from_date=None, to_date=None,
 
 
 @frappe.whitelist()
-def save_manual_checkin(attendance_summary, employee, checkin_time, log_type,
-                        checkin_name=None):
+def save_manual_checkin(attendance_summary=None, employee=None, checkin_time=None,
+                        log_type=None, checkin_name=None):
     """
     Add or update an Employee Checkin manually from the Daily Checkins dashboard.
+    Works standalone (attendance_summary=None) or within an Attendance Summary
+    context (which also validates the employee belongs to the summary).
     Records edited_by / edited_at for audit trail.
     """
     frappe.only_for(["System Manager", "HR Manager", "Biometric Device Manager"])
-    doc = frappe.get_doc("Attendance Summary", attendance_summary)
-    return doc.save_manual_checkin(
+
+    from zkteco_attendance.zkteco_attendance.attendance_processor import save_manual_checkin_record
+
+    if attendance_summary:
+        doc = frappe.get_doc("Attendance Summary", attendance_summary)
+        return doc.save_manual_checkin(
+            employee=employee,
+            checkin_time=checkin_time,
+            log_type=log_type,
+            checkin_name=checkin_name,
+        )
+
+    # Standalone: no Attendance Summary required
+    return save_manual_checkin_record(
         employee=employee,
         checkin_time=checkin_time,
         log_type=log_type,

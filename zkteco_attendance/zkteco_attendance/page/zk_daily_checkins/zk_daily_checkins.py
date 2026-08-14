@@ -15,8 +15,8 @@ def get_data(attendance_summary=None, from_date=None, to_date=None,
 
 
 @frappe.whitelist()
-def save_manual_checkin(attendance_summary, employee, checkin_time, log_type,
-                        checkin_name=None):
+def save_manual_checkin(attendance_summary=None, employee=None, checkin_time=None,
+                        log_type=None, checkin_name=None):
     from zkteco_attendance.zkteco_attendance.api.endpoints import save_manual_checkin as _save
     return _save(attendance_summary=attendance_summary, employee=employee,
                  checkin_time=checkin_time, log_type=log_type, checkin_name=checkin_name)

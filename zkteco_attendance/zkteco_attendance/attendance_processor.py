@@ -115,7 +115,8 @@ def get_shift_for_employee(employee, work_date, default_shift_name=None):
 def fetch_checkins(employee_list, from_date, to_date):
     """
     Fetch all Employee Checkin records for the given employees and period.
-    Returns dict: { employee -> [ {time, log_type, is_overtime, manually_edited, edited_by, edited_at}, ... ] }
+    Returns dict: { employee -> [ {name, time, log_type, is_overtime,
+                                   manually_edited, edited_by, edited_at}, ... ] }
     """
     from_dt   = str(from_date) + " 00:00:00"
     to_dt_ext = str(getdate(to_date) + timedelta(days=1)) + " 23:59:59"
@@ -134,7 +135,7 @@ def fetch_checkins(employee_list, from_date, to_date):
 
     placeholders = ", ".join(["%s"] * len(employee_list))
     rows = frappe.db.sql("""
-        SELECT employee, time, log_type{extra}
+        SELECT name, employee, time, log_type{extra}
         FROM `tabEmployee Checkin`
         WHERE employee IN ({placeholders})
           AND time BETWEEN %s AND %s
@@ -147,6 +148,7 @@ def fetch_checkins(employee_list, from_date, to_date):
     grouped = {}
     for r in rows:
         grouped.setdefault(r.employee, []).append({
+            "name":           r.name,
             "time":           get_datetime(r.time),
             "log_type":       r.log_type,
             "is_overtime":    bool(r.get("is_overtime")) if has_overtime_col else False,
@@ -555,6 +557,7 @@ def get_employee_daily_breakdown(employee, from_date, to_date,
             "night_ot_hours": result.get("night_ot_hours", 0.0),
             "checkins": [
                 {
+                    "name":           c.get("name") or "",
                     "time":           c["time"].strftime("%H:%M:%S"),
                     "log_type":       c["log_type"],
                     "is_overtime":    bool(c.get("is_overtime")),
@@ -593,13 +596,31 @@ def get_daily_checkins_data(attendance_summary=None, from_date=None, to_date=Non
         default_shift = None
 
     if not employee_list:
-        return {
-            "attendance_summary": attendance_summary or "",
-            "company": company or "",
-            "from_date": from_date or "",
-            "to_date": to_date or "",
-            "employees": [],
-        }
+        # Standalone mode (no Attendance Summary): auto-fetch employees that
+        # are mapped to a biometric device (attendance_device_id AND
+        # zk_biometric_device set), so the page works without a summary.
+        if not attendance_summary:
+            # "is set" excludes both empty strings and NULL in Frappe
+            filters = {
+                "status": "Active",
+                "attendance_device_id": ["is", "set"],
+                "zk_biometric_device": ["is", "set"],
+            }
+            if company:
+                filters["company"] = company
+            employee_list = [
+                e["name"]
+                for e in frappe.get_all("Employee", filters=filters, fields=["name"])
+            ]
+
+        if not employee_list:
+            return {
+                "attendance_summary": attendance_summary or "",
+                "company": company or "",
+                "from_date": from_date or "",
+                "to_date": to_date or "",
+                "employees": [],
+            }
 
     checkins_by_employee = fetch_checkins(employee_list, from_date, to_date)
 
@@ -651,3 +672,48 @@ def get_daily_checkins_data(attendance_summary=None, from_date=None, to_date=Non
         "to_date":    to_date,
         "employees":  employees,
     }
+
+
+def save_manual_checkin_record(employee, checkin_time, log_type, checkin_name=None):
+    """
+    Create or update an Employee Checkin manually, without needing an
+    Attendance Summary (standalone Daily Checkins mode).
+
+    Records edited_by / edited_at / manually_edited flags.
+    Returns {"name": ..., "action": "created" | "updated"}.
+    """
+    from frappe.utils import now_datetime as _now
+
+    if not employee or not checkin_time or not log_type:
+        frappe.throw(_("Employee, Check-in Time, and Log Type are required."))
+
+    editor = frappe.session.user
+    now    = _now()
+
+    if checkin_name and frappe.db.exists("Employee Checkin", checkin_name):
+        # Update existing
+        doc = frappe.get_doc("Employee Checkin", checkin_name)
+        doc.time            = checkin_time
+        doc.log_type        = log_type
+        doc.manually_edited = 1
+        doc.edited_by       = editor
+        doc.edited_at       = now
+        doc.save(ignore_permissions=True)
+        frappe.db.commit()
+        return {"name": doc.name, "action": "updated"}
+    else:
+        # Create new
+        emp_doc = frappe.db.get_value("Employee", employee, ["employee_name"], as_dict=True)
+        doc = frappe.get_doc({
+            "doctype":        "Employee Checkin",
+            "employee":       employee,
+            "employee_name":  emp_doc.employee_name if emp_doc else employee,
+            "time":           checkin_time,
+            "log_type":       log_type,
+            "manually_edited": 1,
+            "edited_by":      editor,
+            "edited_at":      now,
+        })
+        doc.insert(ignore_permissions=True)
+        frappe.db.commit()
+        return {"name": doc.name, "action": "created"}

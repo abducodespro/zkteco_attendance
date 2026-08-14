@@ -12,11 +12,10 @@ and v16.
 ### Fresh install
 ```bash
 cd frappe-bench
-bench get-app https://github.com/abducodespro/zkteco_attendance --skip-assets
+bench get-app https://github.com/abducodespro/zkteco_attendance
 bench --site frappe.com install-app zkteco_attendance
 bench --site frappe.com migrate
-bench build --app zkteco_attendance
-bench start
+bench restart
 ```
 ### Clean up if needed
 ```bash

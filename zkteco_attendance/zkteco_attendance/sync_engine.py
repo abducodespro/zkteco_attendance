@@ -10,6 +10,7 @@ from frappe.utils import now_datetime, get_datetime, cint
 from datetime import timedelta
 
 from .zk_client import pull_attendance_from_device, get_punch_type, is_overtime_punch
+from .attendance_processor import get_shift_for_employee, _coerce_time
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -188,6 +189,63 @@ def create_employee_checkin(employee, employee_name, timestamp, log_type, device
 # Main sync
 # ─────────────────────────────────────────────────────────────────────────────
 
+def group_records_by_attendance_date(records, device):
+    """
+    Group records by (user_id, attendance date) for IN/OUT resolution.
+
+    Night-shift aware: a punch at or before the assigned shift's end time
+    (i.e. early AM) is attributed to the previous calendar day, so an IN at
+    17:03 on 01/01 and an OUT at 05:58 on 02/01 land in the same group and
+    alternate correctly instead of each becoming the first (IN) punch of
+    their own calendar day.
+
+    Returns (grouped, emp_cache) where grouped is {(user_id, date): [rec,...]}
+    and emp_cache maps user_id -> matched Employee dict (reused by Step 5 to
+    avoid re-querying).
+    """
+    emp_cache = {}
+    shift_cache = {}
+    grouped = {}
+    for rec in records:
+        ts = get_datetime(rec["timestamp"])
+        user_id = str(rec["user_id"])
+        att_date = get_attendance_date_for_punch(user_id, ts, device, emp_cache, shift_cache)
+        grouped.setdefault((user_id, att_date), []).append(rec)
+    return grouped, emp_cache
+
+
+def get_attendance_date_for_punch(user_id, timestamp, device, emp_cache, shift_cache):
+    """
+    Return the attendance date a punch belongs to.
+
+    For night shifts, a punch in the early AM (at or before the shift end
+    time) belongs to the previous calendar day's shift. Matches the
+    attribution used by attendance_processor.group_checkins_by_date so the
+    IN/OUT alternation here agrees with how hours are later computed.
+    Falls back to the raw calendar date when no employee or no shift
+    assignment is found.
+    """
+    if user_id not in emp_cache:
+        emp_cache[user_id] = get_employee_by_biometric_id(
+            user_id, company=device.company, device_name=device.name
+        )
+    emp = emp_cache.get(user_id)
+    if not emp:
+        return timestamp.date()
+
+    cache_key = (emp["name"], timestamp.date())
+    if cache_key not in shift_cache:
+        shift_cache[cache_key] = get_shift_for_employee(emp["name"], timestamp.date()) or {}
+    shift = shift_cache[cache_key]
+
+    if shift.get("is_night_shift"):
+        end_str = str(shift.get("end_time") or "06:00:00")
+        end_t = _coerce_time(end_str)
+        if timestamp.time() <= end_t:
+            return (timestamp - timedelta(days=1)).date()
+    return timestamp.date()
+
+
 def sync_device(device_name, triggered_by="Manual", user=None):
     device = frappe.get_doc("Biometric Device", device_name)
     user = user or frappe.session.user
@@ -242,11 +300,11 @@ def sync_device(device_name, triggered_by="Manual", user=None):
 
     # ── Step 4: Resolve IN/OUT log types per employee/day ─────────────────
     enable_ot = cint(getattr(device, "enable_overtime_punches", 1))
-    grouped = {}
-    for rec in records:
-        ts = get_datetime(rec["timestamp"])
-        key = (str(rec["user_id"]), ts.date())
-        grouped.setdefault(key, []).append(rec)
+
+    # Group by attendance date (night-shift aware) so an IN on 01/01 17:03
+    # and an OUT on 02/01 05:58 belong to the same group and alternate
+    # IN -> OUT instead of each becoming the first (IN) punch of the day.
+    grouped, emp_cache = group_records_by_attendance_date(records, device)
 
     resolved_log_type = {}
     for (_user_id, _day), day_recs in grouped.items():
@@ -268,8 +326,7 @@ def sync_device(device_name, triggered_by="Manual", user=None):
             log_type  = resolved_log_type.get(id(rec), get_punch_type(punch))
             is_ot     = bool(enable_ot and is_overtime_punch(punch))
 
-            emp = get_employee_by_biometric_id(user_id, company=device.company,
-                                               device_name=device_name)
+            emp = emp_cache.get(user_id)
             if not emp:
                 failed += 1
                 errors.append("No employee for biometric ID: {}".format(user_id))

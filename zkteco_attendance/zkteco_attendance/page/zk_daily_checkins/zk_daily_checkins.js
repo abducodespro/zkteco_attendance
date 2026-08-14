@@ -78,6 +78,27 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
 
     const $body = $(`<div class="zk-daily-body" style="margin-top:18px;"></div>`).appendTo(page.main);
 
+    // ── Delegated handlers (bound ONCE — $body persists across renders) ──
+    // These must NOT be re-bound inside render_data(), otherwise each Load
+    // stacks another copy and a single click opens multiple dialogs.
+    $body.on("click", ".zk-add-checkin", function () {
+        const emp     = $(this).data("employee");
+        const date    = $(this).data("date");
+        const summary = $(this).data("summary");
+        show_checkin_dialog({ employee: emp, date, summary, mode: "add" });
+    });
+
+    $body.on("click", ".zk-edit-checkin", function (e) {
+        e.stopPropagation();
+        const emp     = $(this).data("employee");
+        const date    = $(this).data("date");
+        const time    = $(this).data("time");
+        const logtype = $(this).data("logtype");
+        const summary = $(this).data("summary");
+        const checkin = $(this).data("checkin-name");
+        show_checkin_dialog({ employee: emp, date, time, logtype, summary, checkin_name: checkin, mode: "edit" });
+    });
+
     // ── Load / Clear buttons ──────────────────────────────────────────────
     $filterWrap.find("#zk-load-btn").on("click", () => trigger_load());
     $filterWrap.find("#zk-clear-btn").on("click", () => {
@@ -104,17 +125,18 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
     }
 
     function render_checkin_chips(checkins, emp, date, summary_name) {
+        const summary_attr = summary_name ? frappe.utils.escape_html(summary_name) : "";
+        const add_btn = (with_label) => `
+            <button class="btn btn-xs btn-default zk-add-checkin"
+                    data-employee="${frappe.utils.escape_html(emp)}"
+                    data-date="${date}"
+                    data-summary="${summary_attr}"
+                    style="margin-left:6px;">
+                <i class="fa fa-plus"></i>${with_label ? ` ${__("Add")}` : ""}
+            </button>`;
+
         if (!checkins || !checkins.length) {
-            const addBtn = summary_name
-                ? `<button class="btn btn-xs btn-default zk-add-checkin"
-                           data-employee="${frappe.utils.escape_html(emp)}"
-                           data-date="${date}"
-                           data-summary="${frappe.utils.escape_html(summary_name)}"
-                           style="margin-left:6px;">
-                        <i class="fa fa-plus"></i> ${__("Add")}
-                   </button>`
-                : "";
-            return `<span class="text-muted">${__("No check-ins")}</span>${addBtn}`;
+            return `<span class="text-muted">${__("No check-ins")}</span>${add_btn(true)}`;
         }
 
         const chips = checkins.map((c, idx) => {
@@ -131,30 +153,19 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
                     : __("Manually added/edited");
                 manualBadge = `<span class="zk-manual-badge" title="${tip}">✎</span>`;
             }
-            if (summary_name) {
-                editBtn = `<span class="zk-edit-checkin" title="${__("Edit")}"
-                                data-employee="${frappe.utils.escape_html(emp)}"
-                                data-date="${date}"
-                                data-time="${c.time}"
-                                data-logtype="${c.log_type}"
-                                data-idx="${idx}"
-                                data-summary="${frappe.utils.escape_html(summary_name)}"
-                                style="cursor:pointer;margin-left:2px;opacity:0.6;">✏</span>`;
-            }
+            editBtn = `<span class="zk-edit-checkin" title="${__("Edit")}"
+                            data-employee="${frappe.utils.escape_html(emp)}"
+                            data-date="${date}"
+                            data-time="${c.time}"
+                            data-logtype="${c.log_type}"
+                            data-idx="${idx}"
+                            data-checkin-name="${frappe.utils.escape_html(c.name || "")}"
+                            data-summary="${summary_attr}"
+                            style="cursor:pointer;margin-left:2px;opacity:0.6;">✏</span>`;
             return `<span class="zk-chip ${otClass}">${c.time} <b>${label}</b>${manualBadge}${editBtn}</span>`;
         }).join(" ");
 
-        const addBtn = summary_name
-            ? `<button class="btn btn-xs btn-default zk-add-checkin"
-                       data-employee="${frappe.utils.escape_html(emp)}"
-                       data-date="${date}"
-                       data-summary="${frappe.utils.escape_html(summary_name)}"
-                       style="margin-left:6px;">
-                    <i class="fa fa-plus"></i>
-               </button>`
-            : "";
-
-        return chips + addBtn;
+        return chips + add_btn(false);
     }
 
     function render_employee_table(emp, summary_name) {
@@ -258,29 +269,10 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
                 $ic.removeClass("fa-chevron-down").addClass("fa-chevron-up");
             }
         });
-
-        // Add checkin button
-        $body.on("click", ".zk-add-checkin", function () {
-            const emp     = $(this).data("employee");
-            const date    = $(this).data("date");
-            const summary = $(this).data("summary");
-            show_checkin_dialog({ employee: emp, date, summary, mode: "add" });
-        });
-
-        // Edit checkin icon
-        $body.on("click", ".zk-edit-checkin", function (e) {
-            e.stopPropagation();
-            const emp     = $(this).data("employee");
-            const date    = $(this).data("date");
-            const time    = $(this).data("time");
-            const logtype = $(this).data("logtype");
-            const summary = $(this).data("summary");
-            show_checkin_dialog({ employee: emp, date, time, logtype, summary, mode: "edit" });
-        });
     }
 
     // ── Manual checkin dialog ─────────────────────────────────────────────
-    function show_checkin_dialog({ employee, date, time, logtype, summary, mode }) {
+    function show_checkin_dialog({ employee, date, time, logtype, summary, checkin_name, mode }) {
         const defaultTime = time || "08:00:00";
         const d = new frappe.ui.Dialog({
             title: mode === "edit" ? __("Edit Check-in") : __("Add Check-in"),
@@ -304,11 +296,11 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
                 frappe.call({
                     method: "zkteco_attendance.zkteco_attendance.page.zk_daily_checkins.zk_daily_checkins.save_manual_checkin",
                     args: {
-                        attendance_summary: summary,
+                        attendance_summary: summary || null,
                         employee:           vals.employee,
                         checkin_time,
                         log_type:           vals.log_type,
-                        checkin_name:       null,
+                        checkin_name:       checkin_name || null,
                     },
                     freeze: true,
                     freeze_message: __("Saving…"),
