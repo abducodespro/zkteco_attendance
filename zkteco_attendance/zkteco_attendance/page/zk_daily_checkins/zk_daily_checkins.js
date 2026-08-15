@@ -121,17 +121,17 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
     function status_color(status) {
         const map = { Present: "green", "Half Day": "orange", Absent: "red",
                       Invalid: "darkgrey", "Manual Review": "blue",
-                      Holiday: "purple", "Weekly Off": "grey" };
+                      Holiday: "purple", "Weekly_Off": "grey" };
         return map[status] || "grey";
     }
 
     // OT breakdown chips — Day / Night / Weekend / Holiday overtime
     function ot_cell(d) {
         const chips = [];
-        if (d.day_ot_hours)        chips.push(`<span class="zk-ot-chip zk-ot-day" title="${__("Day OT (06:00-22:00)")}">D ${(d.day_ot_hours||0).toFixed(1)}</span>`);
-        if (d.night_ot_hours)      chips.push(`<span class="zk-ot-chip zk-ot-night" title="${__("Night OT (22:00-06:00)")}">N ${(d.night_ot_hours||0).toFixed(1)}</span>`);
-        if (d.weekend_ot_hours)    chips.push(`<span class="zk-ot-chip zk-ot-weekend" title="${__("Weekend OT (weekly rest day)")}">W ${(d.weekend_ot_hours||0).toFixed(1)}</span>`);
-        if (d.holiday_ot_hours)    chips.push(`<span class="zk-ot-chip zk-ot-holiday" title="${__("Holiday OT (public holiday)")}">H ${(d.holiday_ot_hours||0).toFixed(1)}</span>`);
+        if (d.day_ot_hours)        chips.push(`<span class="zk-ot-chip zk-ot-day" title="${__("Day OT (06:00-22:00)")}" style="border: 1px solid #38684e; background-color: #8bf8c2; border-radius: 4px; padding: 2px 4px">D ${(d.day_ot_hours||0).toFixed(1)}</span>`);
+        if (d.night_ot_hours)      chips.push(`<span class="zk-ot-chip zk-ot-night" title="${__("Night OT (22:00-06:00)")}" style="border: 1px solid #5d6838; background-color: #d6f88b; border-radius: 4px; padding: 2px 4px">N ${(d.night_ot_hours||0).toFixed(1)}</span>`);
+        if (d.weekend_ot_hours)    chips.push(`<span class="zk-ot-chip zk-ot-weekend" title="${__("Weekend OT (weekly rest day)")}" style="border: 1px solid #683848; background-color: #f88bc5; border-radius: 4px; padding: 2px 4px;">W ${(d.weekend_ot_hours||0).toFixed(1)}</span>`);
+        if (d.holiday_ot_hours)    chips.push(`<span class="zk-ot-chip zk-ot-holiday" title="${__("Holiday OT (public holiday)")}" style="border: 1px solid #4a3868; background-color: #bc8bf8; border-radius: 4px; padding: 2px 4px;">H ${(d.holiday_ot_hours||0).toFixed(1)}</span>`);
         return chips.length ? chips.join(" ") : `<span class="text-muted">—</span>`;
     }
 
@@ -190,12 +190,12 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
                         : "";
             return `
                 <tr>
-                    <td>${frappe.datetime.str_to_user(d.date)}${dayMark}</td>
-                    <td>${__(d.weekday)}</td>
-                    <td><span class="indicator-pill ${status_color(d.status)}">${__(d.status)}</span></td>
-                    <td class="text-right">${(d.hours||0).toFixed(2)}</td>
-                    <td class="text-right ${d.overtime_hours ? 'text-warning' : ''}">${ot_cell(d)}</td>
-                    <td>${render_checkin_chips(d.checkins, emp.employee, d.date, summary_name)}</td>
+                    <td style="border: 1px solid #385068;">${frappe.datetime.str_to_user(d.date)}${dayMark}</td>
+                    <td style="border: 1px solid #385068;">${__(d.weekday)}</td>
+                    <td style="border: 1px solid #385068;"><span class="indicator-pill ${status_color(d.status)}">${__(d.status)}</span></td>
+                    <td class="text-right" style="border: 1px solid #385068;">${(d.hours||0).toFixed(2)}</td>
+                    <td class="text-right ${d.overtime_hours ? 'text-warning' : ''}" style="border: 1px solid #385068;">${ot_cell(d)}</td>
+                    <td style="border: 1px solid #385068;">${render_checkin_chips(d.checkins, emp.employee, d.date, summary_name)}</td>
                 </tr>`;
         }).join("");
 
@@ -203,12 +203,12 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
             <table class="table table-bordered zk-daily-table">
                 <thead>
                     <tr>
-                        <th style="width:120px">${__("Date")}</th>
-                        <th style="width:90px">${__("Day")}</th>
-                        <th style="width:115px">${__("Status")}</th>
-                        <th style="width:70px" class="text-right">${__("Hours")}</th>
-                        <th style="width:160px" class="text-right">${__("OT Breakdown")}</th>
-                        <th>${__("Check-ins")}</th>
+                        <th style="width:120px; border: 1px solid #385068; background-color: #8bc2f8;">${__("Date")}</th>
+                        <th style="width:90px; border: 1px solid #385068; background-color: #8bc2f8;">${__("Day")}</th>
+                        <th style="width:120px; border: 1px solid #385068; background-color: #8bc2f8;">${__("Status")}</th>
+                        <th style="width:70px; border: 1px solid #385068; background-color: #8bc2f8;" class="text-right">${__("Hours")}</th>
+                        <th style="width:160px; border: 1px solid #385068; background-color: #8bc2f8;" class="text-right">${__("OT Breakdown")}</th>
+                        <th style="border: 1px solid #385068; background-color: #8bc2f8;">${__("Check-ins")}</th>
                     </tr>
                 </thead>
                 <tbody>${rows}</tbody>
