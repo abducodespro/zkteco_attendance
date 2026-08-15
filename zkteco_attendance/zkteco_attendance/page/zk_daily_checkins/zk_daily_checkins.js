@@ -161,7 +161,7 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
                             data-idx="${idx}"
                             data-checkin-name="${frappe.utils.escape_html(c.name || "")}"
                             data-summary="${summary_attr}"
-                            style="cursor:pointer;margin-left:2px;opacity:0.6;">✏</span>`;
+                            style="cursor:pointer;margin-left:4px;opacity:0.6;">✎</span>`;
             return `<span class="zk-chip ${otClass}">${c.time} <b>${label}</b>${manualBadge}${editBtn}</span>`;
         }).join(" ");
 
