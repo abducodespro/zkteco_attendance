@@ -120,8 +120,19 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
 
     function status_color(status) {
         const map = { Present: "green", "Half Day": "orange", Absent: "red",
-                      Invalid: "darkgrey", "Manual Review": "blue" };
+                      Invalid: "darkgrey", "Manual Review": "blue",
+                      Holiday: "purple", "Weekly Off": "grey" };
         return map[status] || "grey";
+    }
+
+    // OT breakdown chips — Day / Night / Weekend / Holiday overtime
+    function ot_cell(d) {
+        const chips = [];
+        if (d.day_ot_hours)        chips.push(`<span class="zk-ot-chip zk-ot-day" title="${__("Day OT (06:00-22:00)")}">D ${(d.day_ot_hours||0).toFixed(1)}</span>`);
+        if (d.night_ot_hours)      chips.push(`<span class="zk-ot-chip zk-ot-night" title="${__("Night OT (22:00-06:00)")}">N ${(d.night_ot_hours||0).toFixed(1)}</span>`);
+        if (d.weekend_ot_hours)    chips.push(`<span class="zk-ot-chip zk-ot-weekend" title="${__("Weekend OT (weekly rest day)")}">W ${(d.weekend_ot_hours||0).toFixed(1)}</span>`);
+        if (d.holiday_ot_hours)    chips.push(`<span class="zk-ot-chip zk-ot-holiday" title="${__("Holiday OT (public holiday)")}">H ${(d.holiday_ot_hours||0).toFixed(1)}</span>`);
+        return chips.length ? chips.join(" ") : `<span class="text-muted">—</span>`;
     }
 
     function render_checkin_chips(checkins, emp, date, summary_name) {
@@ -162,7 +173,7 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
                             data-checkin-name="${frappe.utils.escape_html(c.name || "")}"
                             data-summary="${summary_attr}"
                             style="cursor:pointer;margin-left:4px;opacity:0.6;">✎</span>`;
-            return `<span class="zk-chip ${otClass}">${c.time} <b>${label}</b>${manualBadge}${editBtn}</span>`;
+            return `<span class="zk-chip ${otClass}">${c.time} <b>${label}</b>${manualBadge} ${editBtn}</span>`;
         }).join(" ");
 
         return chips + add_btn(false);
@@ -170,21 +181,20 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
 
     function render_employee_table(emp, summary_name) {
         const rows = emp.days.map(d => {
-            const satMark = d.is_saturday
-                ? `<span class="text-muted" style="font-size:0.7rem;margin-left:4px;">SAT</span>`
-                : "";
-            const otCell = (d.day_ot_hours || d.night_ot_hours)
-                ? `<span title="${__("Day OT")}: ${(d.day_ot_hours||0).toFixed(2)}h | ${__("Night OT")}: ${(d.night_ot_hours||0).toFixed(2)}h">
-                       ${(d.overtime_hours||0).toFixed(2)}
-                   </span>`
-                : (d.overtime_hours || 0).toFixed(2);
+            const dayMark = d.is_holiday
+                ? `<span class="zk-day-mark zk-day-holiday" title="${__("Public Holiday")}">HOL</span>`
+                : d.is_weekend
+                    ? `<span class="zk-day-mark zk-day-weekend" title="${__("Weekly Rest Day")}">SUN</span>`
+                    : d.is_saturday
+                        ? `<span class="zk-day-mark" title="${__("Saturday")}">SAT</span>`
+                        : "";
             return `
                 <tr>
-                    <td>${frappe.datetime.str_to_user(d.date)}${satMark}</td>
+                    <td>${frappe.datetime.str_to_user(d.date)}${dayMark}</td>
                     <td>${__(d.weekday)}</td>
                     <td><span class="indicator-pill ${status_color(d.status)}">${__(d.status)}</span></td>
                     <td class="text-right">${(d.hours||0).toFixed(2)}</td>
-                    <td class="text-right ${d.overtime_hours ? 'text-warning' : ''}">${otCell}</td>
+                    <td class="text-right ${d.overtime_hours ? 'text-warning' : ''}">${ot_cell(d)}</td>
                     <td>${render_checkin_chips(d.checkins, emp.employee, d.date, summary_name)}</td>
                 </tr>`;
         }).join("");
@@ -193,11 +203,11 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
             <table class="table table-bordered zk-daily-table">
                 <thead>
                     <tr>
-                        <th style="width:115px">${__("Date")}</th>
-                        <th style="width:95px">${__("Day")}</th>
+                        <th style="width:120px">${__("Date")}</th>
+                        <th style="width:90px">${__("Day")}</th>
                         <th style="width:115px">${__("Status")}</th>
                         <th style="width:70px" class="text-right">${__("Hours")}</th>
-                        <th style="width:75px" class="text-right">${__("OT Hrs")}</th>
+                        <th style="width:160px" class="text-right">${__("OT Breakdown")}</th>
                         <th>${__("Check-ins")}</th>
                     </tr>
                 </thead>
@@ -223,6 +233,12 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
                         ? `&nbsp;|&nbsp; <a href="/app/attendance-summary/${encodeURIComponent(data.attendance_summary)}">${frappe.utils.escape_html(data.attendance_summary)}</a>`
                         : ""}
                 </div>
+                <div class="text-muted" style="font-size:0.72rem;margin-top:4px;">
+                    ${__("OT legend")}: <span class="zk-ot-chip zk-ot-day">D ${__("Day")}</span>
+                    <span class="zk-ot-chip zk-ot-night">N ${__("Night")}</span>
+                    <span class="zk-ot-chip zk-ot-weekend">W ${__("Weekend")}</span>
+                    <span class="zk-ot-chip zk-ot-holiday">H ${__("Holiday")}</span>
+                </div>
             </div>`;
 
         const cards = data.employees.map(emp => {
@@ -230,8 +246,10 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
             const totalOt  = (emp.days||[]).reduce((s,d) => s+(d.overtime_hours||0), 0);
             const dayOt    = (emp.days||[]).reduce((s,d) => s+(d.day_ot_hours||0), 0);
             const nightOt  = (emp.days||[]).reduce((s,d) => s+(d.night_ot_hours||0), 0);
+            const weekendOt = (emp.days||[]).reduce((s,d) => s+(d.weekend_ot_hours||0), 0);
+            const holidayOt = (emp.days||[]).reduce((s,d) => s+(d.holiday_ot_hours||0), 0);
             const otLabel  = totalOt
-                ? `<span class="text-warning" style="margin-right:10px;" title="${__("Day OT")}: ${dayOt.toFixed(2)}h | ${__("Night OT")}: ${nightOt.toFixed(2)}h">
+                ? `<span class="text-warning" style="margin-right:10px;" title="${__("Day OT")}: ${dayOt.toFixed(2)}h | ${__("Night OT")}: ${nightOt.toFixed(2)}h | ${__("Weekend OT")}: ${weekendOt.toFixed(2)}h | ${__("Holiday OT")}: ${holidayOt.toFixed(2)}h">
                        ${__("OT")}: ${totalOt.toFixed(2)}h
                    </span>`
                 : "";

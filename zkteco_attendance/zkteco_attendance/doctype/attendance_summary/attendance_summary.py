@@ -117,6 +117,8 @@ def _process_background(summary_name):
         row.overtime_hours      = result["overtime_hours"]
         row.day_ot_hours        = result.get("day_ot_hours", 0.0)
         row.night_ot_hours      = result.get("night_ot_hours", 0.0)
+        row.weekend_ot_hours    = result.get("weekend_ot_hours", 0.0)
+        row.holiday_ot_hours    = result.get("holiday_ot_hours", 0.0)
         row.overtime_days       = result["overtime_days"]
         row.invalid_days        = result["invalid_days"]
         row.manual_review_days  = result["manual_review_days"]
@@ -126,7 +128,11 @@ def _process_background(summary_name):
     doc.status             = "Completed"
     doc.total_employees    = len(doc.details)
     doc.total_working_days = count_working_days(doc.from_date, doc.to_date)
-    doc.total_overtime_hours = round(sum(flt(r.overtime_hours) for r in doc.details), 2)
+    doc.total_overtime_hours   = round(sum(flt(r.overtime_hours) for r in doc.details), 2)
+    doc.total_day_ot_hours     = round(sum(flt(r.day_ot_hours) for r in doc.details), 2)
+    doc.total_night_ot_hours   = round(sum(flt(r.night_ot_hours) for r in doc.details), 2)
+    doc.total_weekend_ot_hours = round(sum(flt(r.weekend_ot_hours) for r in doc.details), 2)
+    doc.total_holiday_ot_hours = round(sum(flt(r.holiday_ot_hours) for r in doc.details), 2)
     doc.save(ignore_permissions=True)
     frappe.db.commit()
 

@@ -28,11 +28,7 @@
   "overtime_calculation_method",
   "overtime_threshold_minutes",
   "column_break_ot",
-  "overtime_rate_multiplier",
   "max_overtime_hours_per_day",
-  "column_break_ot2",
-  "day_overtime_rate",
-  "night_overtime_rate",
   "section_ot_window",
   "standard_start_time",
   "column_break_ot3",
@@ -200,14 +196,6 @@
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "overtime_rate_multiplier",
-   "fieldtype": "Float",
-   "label": "Overtime Rate Multiplier",
-   "default": "1.5",
-   "depends_on": "eval:doc.enable_overtime",
-   "description": "Used for reference only \u2014 actual OT pay rules are configured in Payroll."
-  },
-  {
    "fieldname": "max_overtime_hours_per_day",
    "fieldtype": "Float",
    "label": "Max OT Hours per Day",
@@ -220,27 +208,11 @@
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "day_overtime_rate",
-   "fieldtype": "Float",
-   "label": "Day OT Rate Multiplier",
-   "default": "1.5",
-   "depends_on": "eval:doc.enable_overtime",
-   "description": "Rate for daytime overtime hours (e.g. 1.5x). Applied to hours worked before the standard shift start time."
-  },
-  {
-   "fieldname": "night_overtime_rate",
-   "fieldtype": "Float",
-   "label": "Night OT Rate Multiplier",
-   "default": "1.75",
-   "depends_on": "eval:doc.enable_overtime",
-   "description": "Rate for night/late overtime hours (e.g. 1.75x). Applied to hours worked after the standard shift ends into night."
-  },
-  {
    "fieldname": "section_ot_window",
    "fieldtype": "Section Break",
    "label": "Overtime Time Windows",
    "depends_on": "eval:doc.enable_overtime",
-   "description": "Define which clock hours count as Day OT vs Night OT. Example: Guards shift 17:00-06:00 \u2014 standard ends at 01:00 (8 hrs), Night OT window 01:00-06:00 (5 hrs at 1.75x). Day shift 06:00-17:00 \u2014 Day OT window 06:00-08:00 (2 hrs at 1.5x, pre-standard start)."
+   "description": "Define which clock hours count as Day OT vs Night OT. Example: Guards shift 17:00-06:00 \u2014 standard ends at 01:00 (8 hrs), Night OT window 01:00-06:00. Day shift 06:00-17:00 \u2014 Day OT window 06:00-08:00 (pre-standard start)."
   },
   {
    "fieldname": "standard_start_time",

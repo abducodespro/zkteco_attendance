@@ -7,7 +7,7 @@
   "company","column_break_1","from_date","to_date","status",
   "section_settings","shift_type","col_break_settings","working_hours_method","missing_checkin_action",
   "section_details","details",
-  "section_summary","total_employees","total_working_days","column_break_summary","total_overtime_hours"
+  "section_summary","total_employees","total_working_days","column_break_summary","total_overtime_hours","total_day_ot_hours","total_night_ot_hours","total_weekend_ot_hours","total_holiday_ot_hours"
  ],
  "fields": [
   {"fieldname":"company","fieldtype":"Link","label":"Company","options":"Company","reqd":1,"in_list_view":1},
@@ -26,7 +26,11 @@
   {"fieldname":"total_employees","fieldtype":"Int","label":"Total Employees","read_only":1},
   {"fieldname":"total_working_days","fieldtype":"Int","label":"Working Days in Period","read_only":1},
   {"fieldname":"column_break_summary","fieldtype":"Column Break"},
-  {"fieldname":"total_overtime_hours","fieldtype":"Float","label":"Total Overtime Hours","read_only":1}
+  {"fieldname":"total_overtime_hours","fieldtype":"Float","label":"Total Overtime Hours","read_only":1},
+  {"fieldname":"total_day_ot_hours","fieldtype":"Float","label":"Total Day OT Hours","read_only":1},
+  {"fieldname":"total_night_ot_hours","fieldtype":"Float","label":"Total Night OT Hours","read_only":1},
+  {"fieldname":"total_weekend_ot_hours","fieldtype":"Float","label":"Total Weekend OT Hours","read_only":1},
+  {"fieldname":"total_holiday_ot_hours","fieldtype":"Float","label":"Total Holiday OT Hours","read_only":1}
  ],
  "links": [],
  "modified": "2024-01-01 00:00:00.000000",

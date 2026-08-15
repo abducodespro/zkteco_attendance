@@ -11,14 +11,85 @@ Handles:
 - Present / Half-Day / Absent classification
 - Missing checkin scenarios
 - Absent hours calculation
-- Overtime calculation (After Standard Hours / After Shift End Time / OT Punches Only)
+- Overtime calculation split into four explicit categories:
+    Day OT      - 06:00 to 22:00 on regular working days, for hours beyond the daily limit
+    Night OT    - 22:00 to 06:00 (next day) on regular working days
+    Weekend OT  - 00:00 to 24:00 on the weekly rest day (Sunday)
+    Holiday OT  - 00:00 to 24:00 on official public holidays (Holiday List)
 """
 
 import frappe
 from frappe import _
 from frappe.utils import getdate, get_datetime, nowdate, flt
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, time
 from zkteco_attendance.zkteco_attendance.utils import has_column
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Overtime time windows (fixed policy)
+# ─────────────────────────────────────────────────────────────────────────────
+
+DAY_OT_START    = time(6, 0)    # 06:00
+DAY_OT_END      = time(22, 0)   # 22:00
+NIGHT_OT_START  = time(22, 0)   # 22:00
+NIGHT_OT_END    = time(6, 0)    # 06:00 (next day)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Holidays (public holidays from the Holiday List doctype)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def get_holiday_list_for_employee(employee):
+    """
+    Return the Holiday List name for an employee.
+    Uses Employee.holiday_list, falling back to the Company default.
+    Returns None when no Holiday List is configured.
+    """
+    holiday_list = None
+    try:
+        holiday_list = frappe.db.get_value("Employee", employee, "holiday_list")
+    except Exception:
+        holiday_list = None
+    if not holiday_list:
+        try:
+            company = frappe.db.get_value("Employee", employee, "company")
+        except Exception:
+            company = None
+        if company:
+            try:
+                holiday_list = frappe.db.get_value("Company", company, "default_holiday_list")
+            except Exception:
+                holiday_list = None
+    return holiday_list
+
+
+def get_holidays_in_range(employee, from_date, to_date):
+    """
+    Return a set of dates that are official public holidays for the employee
+    within [from_date, to_date].
+
+    Weekly-off entries in the Holiday child table (weekly_off = 1) are
+    excluded — only true public holidays count as holiday overtime.
+    """
+    holiday_list = get_holiday_list_for_employee(employee)
+    if not holiday_list:
+        return set()
+    if not frappe.db.table_exists("Holiday"):
+        return set()
+
+    filters = {
+        "parent": holiday_list,
+        "holiday_date": ["between", [str(from_date), str(to_date)]],
+    }
+    if has_column("Holiday", "weekly_off"):
+        filters["weekly_off"] = 0
+
+    rows = frappe.db.get_all(
+        "Holiday",
+        filters=filters,
+        fields=["holiday_date"],
+    )
+    return {getdate(r.holiday_date) for r in rows}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -66,9 +137,8 @@ SHIFT_FIELDS = [
     "late_entry_grace", "early_exit_grace",
     "saturday_mode", "saturday_half_day_hours",
     "enable_overtime", "overtime_calculation_method",
-    "overtime_threshold_minutes", "overtime_rate_multiplier",
+    "overtime_threshold_minutes",
     "max_overtime_hours_per_day",
-    "day_overtime_rate", "night_overtime_rate",
     "standard_start_time", "night_ot_start_time", "night_ot_end_time",
 ]
 
@@ -248,120 +318,130 @@ def calc_working_hours(day_checkins, method="First IN - Last OUT"):
 # Overtime calculation
 # ─────────────────────────────────────────────────────────────────────────────
 
-def calc_overtime_hours(day_checkins, shift, total_hours):
+def _worked_intervals(day_checkins, method):
     """
-    Calculate overtime hours for one day.
-    Returns a dict:
-      {
-        ot_hours:        total overtime hours,
-        day_ot_hours:    hours at day OT rate (e.g. 1.5x),
-        night_ot_hours:  hours at night OT rate (e.g. 1.75x),
-      }
-    Returns zeros dict if overtime is not enabled on the shift.
+    Return the worked time intervals as a list of (start, end) datetimes,
+    following the same rules as calc_working_hours (First IN - Last OUT
+    or Actual Pairs).
+    """
+    sorted_ci = sorted(day_checkins, key=lambda c: c["time"])
+    if method == "Actual Pairs (IN-OUT)":
+        intervals = []
+        i = 0
+        while i < len(sorted_ci) - 1:
+            if sorted_ci[i]["log_type"] == "IN" and sorted_ci[i + 1]["log_type"] == "OUT":
+                intervals.append((sorted_ci[i]["time"], sorted_ci[i + 1]["time"]))
+                i += 2
+            else:
+                i += 1
+        return intervals
+    if not sorted_ci:
+        return []
+    return [(sorted_ci[0]["time"], sorted_ci[-1]["time"])]
 
-    Guard shift examples handled:
-    ─ Night guard: clock in 17:00, clock out 06:00.
-        Standard 8 hrs → 17:00–01:00. Night OT window 01:00–06:00 = 5 hrs (1.75×).
-        Set: night_ot_start_time=01:00, night_ot_end_time=06:00, night_overtime_rate=1.75
-    ─ Day guard: clock in 06:00, clock out 17:00.
-        Day OT window before standard start: 06:00–08:00 = 2 hrs (1.5×).
-        Set: standard_start_time=08:00, day_overtime_rate=1.5
+
+def _overlap_hours(start, end, win_start, win_end):
+    """Hours of overlap between a worked interval [start, end] and a window."""
+    return max(0.0, (min(end, win_end) - max(start, win_start)).total_seconds() / 3600)
+
+
+def _window_hours(intervals, start_t, end_t):
     """
-    zero = {"ot_hours": 0.0, "day_ot_hours": 0.0, "night_ot_hours": 0.0}
+    Sum of worked hours that fall inside the recurring daily clock window
+    [start_t, end_t]. Windows that cross midnight (start_t > end_t) are
+    handled by anchoring the window on the interval start date and, when
+    the interval spills past midnight, again on the interval end date.
+    """
+    crosses = start_t > end_t
+    total = 0.0
+    for start, end in intervals:
+        d0 = start.date()
+        if crosses:
+            ws = datetime.combine(d0, start_t)
+            we = datetime.combine(d0 + timedelta(days=1), end_t)
+        else:
+            ws = datetime.combine(d0, start_t)
+            we = datetime.combine(d0, end_t)
+        total += _overlap_hours(start, end, ws, we)
+
+        # Interval crosses midnight — also anchor the window on the end date
+        if end.date() > d0:
+            d1 = end.date()
+            if crosses:
+                ws = datetime.combine(d1, start_t)
+                we = datetime.combine(d1 + timedelta(days=1), end_t)
+            else:
+                ws = datetime.combine(d1, start_t)
+                we = datetime.combine(d1, end_t)
+            total += _overlap_hours(start, end, ws, we)
+    return total
+
+
+def calc_overtime_hours(day_checkins, shift, total_hours, day_type="working",
+                        method="First IN - Last OUT"):
+    """
+    Calculate overtime hours for one day, split into four explicit categories:
+      {
+        ot_hours:         total overtime hours,
+        day_ot_hours:     hours in 06:00-22:00 on working days beyond the daily limit,
+        night_ot_hours:   hours in 22:00-06:00 (next day) on working days,
+        weekend_ot_hours: hours worked on the weekly rest day (Sunday),
+        holiday_ot_hours: hours worked on official public holidays,
+      }
+    Returns the zeros dict if overtime is disabled on the shift.
+
+    day_type is one of "working" | "weekend" | "holiday":
+      - working: Day OT = day-window hours (06:00-22:00) beyond the daily limit
+                 (standard_working_hours, default 8); Night OT = all night-window
+                 hours (22:00-06:00 next day).
+      - weekend: every hour worked counts as weekend OT (00:00-24:00).
+      - holiday: every hour worked counts as holiday OT (00:00-24:00).
+    """
+    zero = {"ot_hours": 0.0, "day_ot_hours": 0.0, "night_ot_hours": 0.0,
+            "weekend_ot_hours": 0.0, "holiday_ot_hours": 0.0}
     if not shift or not shift.get("enable_overtime"):
         return zero
+    if not day_checkins:
+        return zero
 
-    method = shift.get("overtime_calculation_method") or "After Standard Hours"
-    threshold_minutes = flt(shift.get("overtime_threshold_minutes") or 0)
-    threshold_hours   = threshold_minutes / 60.0
-    max_ot            = flt(shift.get("max_overtime_hours_per_day") or 0)
+    std_hours       = flt(shift.get("standard_working_hours") or 8)
+    threshold_hours = flt(shift.get("overtime_threshold_minutes") or 0) / 60.0
+    max_ot          = flt(shift.get("max_overtime_hours_per_day") or 0)
 
-    total_ot   = 0.0
-    day_ot     = 0.0
-    night_ot   = 0.0
+    day_ot = night_ot = weekend_ot = holiday_ot = 0.0
 
-    if method == "OT Punches Only":
-        ot_checkins = [c for c in day_checkins if c.get("is_overtime")]
-        total_ot = calc_hours_actual_pairs(ot_checkins)
+    if day_type == "holiday":
+        holiday_ot = total_hours
+    elif day_type == "weekend":
+        weekend_ot = total_hours
+    else:
+        intervals = _worked_intervals(day_checkins, method)
+        day_win   = _window_hours(intervals, DAY_OT_START, DAY_OT_END)
+        night_win = _window_hours(intervals, NIGHT_OT_START, NIGHT_OT_END)
+        day_ot    = max(0.0, day_win - std_hours)
+        night_ot  = night_win
 
-    elif method == "After Shift End Time":
-        end_str = shift.get("end_time")
-        if end_str and day_checkins:
-            end_t = _coerce_time(end_str)
-            outs  = [c["time"] for c in day_checkins if c["log_type"] == "OUT"]
-            if outs:
-                last_out      = max(outs)
-                shift_end_dt  = datetime.combine(last_out.date(), end_t)
-                if last_out > shift_end_dt:
-                    total_ot = (last_out - shift_end_dt).total_seconds() / 3600
-
-    else:  # "After Standard Hours" (default) + guard window logic
-        std_hours = flt(shift.get("standard_working_hours") or 8)
-
-        # ── Guard Night OT window ─────────────────────────────────────────
-        night_ot_start_str = shift.get("night_ot_start_time")
-        night_ot_end_str   = shift.get("night_ot_end_time")
-        if night_ot_start_str and night_ot_end_str and day_checkins:
-            not_start = _coerce_time(night_ot_start_str)
-            not_end   = _coerce_time(night_ot_end_str)
-
-            # Last OUT of the day (or night)
-            outs = sorted([c["time"] for c in day_checkins if c["log_type"] == "OUT"])
-            ins  = sorted([c["time"] for c in day_checkins if c["log_type"] == "IN"])
-
-            if outs and ins:
-                first_in = ins[0]
-                last_out = outs[-1]
-
-                # Build night OT boundary datetimes relative to checkout date
-                # Night OT start is on the same date as last_out (early morning)
-                not_start_dt = datetime.combine(last_out.date(), not_end)   # e.g. 06:00 same day
-                not_begin_dt = datetime.combine(last_out.date(), not_start) # e.g. 01:00 same day
-
-                # If not_begin (01:00) is before last_out and not_start (06:00) is >= last_out
-                # i.e. employee was present through the night OT window
-                if last_out > not_begin_dt:
-                    clipped_end = min(last_out, not_start_dt)
-                    overlap = (clipped_end - not_begin_dt).total_seconds() / 3600
-                    night_ot = max(0.0, overlap)
-
-        # ── Guard Day OT window (pre-standard start) ──────────────────────
-        std_start_str = shift.get("standard_start_time")
-        if std_start_str and day_checkins:
-            std_start_t = _coerce_time(std_start_str)
-            ins = sorted([c["time"] for c in day_checkins if c["log_type"] == "IN"])
-            if ins:
-                first_in = ins[0]
-                std_start_dt = datetime.combine(first_in.date(), std_start_t)
-                if first_in < std_start_dt:
-                    day_ot = (std_start_dt - first_in).total_seconds() / 3600
-
-        # If no time-window OT was configured, fall back to After Standard Hours
-        if night_ot == 0.0 and day_ot == 0.0 and total_hours > std_hours:
-            total_ot = total_hours - std_hours
-
-    # Combine windowed OT
-    if night_ot > 0.0 or day_ot > 0.0:
-        total_ot = night_ot + day_ot
+    total_ot = day_ot + night_ot + weekend_ot + holiday_ot
 
     # Apply threshold
     if total_ot <= threshold_hours:
-        total_ot = 0.0
-        day_ot   = 0.0
-        night_ot = 0.0
+        return zero
 
-    # Apply daily cap
+    # Apply daily cap (proportionally across categories)
     if max_ot and total_ot > max_ot:
-        # Cap proportionally
         scale = max_ot / total_ot
-        day_ot   = round(day_ot   * scale, 2)
-        night_ot = round(night_ot * scale, 2)
-        total_ot = max_ot
+        day_ot     *= scale
+        night_ot   *= scale
+        weekend_ot *= scale
+        holiday_ot *= scale
+        total_ot    = max_ot
 
     return {
-        "ot_hours":       round(total_ot, 2),
-        "day_ot_hours":   round(day_ot,   2),
-        "night_ot_hours": round(night_ot, 2),
+        "ot_hours":         round(total_ot, 2),
+        "day_ot_hours":     round(day_ot,   2),
+        "night_ot_hours":   round(night_ot, 2),
+        "weekend_ot_hours": round(weekend_ot, 2),
+        "holiday_ot_hours": round(holiday_ot, 2),
     }
 
 
@@ -369,10 +449,17 @@ def calc_overtime_hours(day_checkins, shift, total_hours):
 # Daily status classification
 # ─────────────────────────────────────────────────────────────────────────────
 
-def classify_day(day_checkins, shift, doc_method, doc_missing_action, is_saturday=False):
+def classify_day(day_checkins, shift, doc_method, doc_missing_action,
+                 is_saturday=False, day_type="working"):
     """
     Returns a dict with attendance status, hours, and overtime breakdown.
     When is_saturday=True, applies Saturday-specific hour thresholds.
+
+    day_type is one of "working" | "weekend" | "holiday":
+      - weekend (Sunday weekly rest day): status is "Weekly Off" when no
+        checkins, "Present" when worked (all hours = weekend OT).
+      - holiday (public holiday): status is "Holiday" when no checkins,
+        "Present" when worked (all hours = holiday OT).
     """
     full_hours = flt(shift.get("full_day_hours") or 8)
     half_hours = flt(shift.get("half_day_hours") or 4)
@@ -389,12 +476,16 @@ def classify_day(day_checkins, shift, doc_method, doc_missing_action, is_saturda
         half_hours = 0.1       # any attendance counts as half day
         std_hours  = std_hours / 2
 
-    empty_ot = {"ot_hours": 0.0, "day_ot_hours": 0.0, "night_ot_hours": 0.0}
+    empty_ot = {"ot_hours": 0.0, "day_ot_hours": 0.0, "night_ot_hours": 0.0,
+                "weekend_ot_hours": 0.0, "holiday_ot_hours": 0.0}
 
     # No checkins at all
     if not day_checkins:
-        return {"status": "Absent", "hours": 0.0, "absent_hours": std_hours,
-                "overtime_hours": 0.0, "day_ot_hours": 0.0, "night_ot_hours": 0.0}
+        if day_type == "holiday":
+            return {"status": "Holiday", "hours": 0.0, "absent_hours": 0.0, **empty_ot}
+        if day_type == "weekend":
+            return {"status": "Weekly Off", "hours": 0.0, "absent_hours": 0.0, **empty_ot}
+        return {"status": "Absent", "hours": 0.0, "absent_hours": std_hours, **empty_ot}
 
     has_in  = any(c["log_type"] == "IN"  for c in day_checkins)
     has_out = any(c["log_type"] == "OUT" for c in day_checkins)
@@ -402,38 +493,33 @@ def classify_day(day_checkins, shift, doc_method, doc_missing_action, is_saturda
     if not (has_in and has_out):
         if missing == "Mark as Present":
             hours = calc_working_hours(day_checkins, method)
-            ot = calc_overtime_hours(day_checkins, shift, hours)
-            return {"status": "Present", "hours": hours, "absent_hours": 0.0,
-                    "overtime_hours": ot["ot_hours"], "day_ot_hours": ot["day_ot_hours"],
-                    "night_ot_hours": ot["night_ot_hours"]}
+            ot = calc_overtime_hours(day_checkins, shift, hours,
+                                     day_type=day_type, method=method)
+            return {"status": "Present", "hours": hours, "absent_hours": 0.0, **ot}
         elif missing == "Require Manual Review":
-            return {"status": "Manual Review", "hours": 0.0, "absent_hours": 0.0,
-                    "overtime_hours": 0.0, "day_ot_hours": 0.0, "night_ot_hours": 0.0}
+            return {"status": "Manual Review", "hours": 0.0, "absent_hours": 0.0, **empty_ot}
         else:
-            return {"status": "Invalid", "hours": 0.0, "absent_hours": 0.0,
-                    "overtime_hours": 0.0, "day_ot_hours": 0.0, "night_ot_hours": 0.0}
+            return {"status": "Invalid", "hours": 0.0, "absent_hours": 0.0, **empty_ot}
 
     hours = calc_working_hours(day_checkins, method)
-    ot    = calc_overtime_hours(day_checkins, shift, hours)
+    ot    = calc_overtime_hours(day_checkins, shift, hours, day_type=day_type, method=method)
+
+    # Weekly rest day / public holiday worked — every hour is OT
+    if day_type == "holiday":
+        return {"status": "Present", "hours": hours, "absent_hours": 0.0, **ot}
+    if day_type == "weekend":
+        return {"status": "Present", "hours": hours, "absent_hours": 0.0, **ot}
 
     if is_saturday and saturday_mode == "Half Day":
         # Saturday with any attendance → half day, no absent hours
-        return {"status": "Half Day", "hours": hours, "absent_hours": 0.0,
-                "overtime_hours": ot["ot_hours"], "day_ot_hours": ot["day_ot_hours"],
-                "night_ot_hours": ot["night_ot_hours"]}
+        return {"status": "Half Day", "hours": hours, "absent_hours": 0.0, **ot}
 
     if hours >= full_hours:
-        return {"status": "Present", "hours": hours, "absent_hours": 0.0,
-                "overtime_hours": ot["ot_hours"], "day_ot_hours": ot["day_ot_hours"],
-                "night_ot_hours": ot["night_ot_hours"]}
+        return {"status": "Present", "hours": hours, "absent_hours": 0.0, **ot}
     elif hours >= half_hours:
-        return {"status": "Half Day", "hours": hours, "absent_hours": std_hours / 2,
-                "overtime_hours": ot["ot_hours"], "day_ot_hours": ot["day_ot_hours"],
-                "night_ot_hours": ot["night_ot_hours"]}
+        return {"status": "Half Day", "hours": hours, "absent_hours": std_hours / 2, **ot}
     else:
-        return {"status": "Absent", "hours": hours, "absent_hours": std_hours,
-                "overtime_hours": ot["ot_hours"], "day_ot_hours": ot["day_ot_hours"],
-                "night_ot_hours": ot["night_ot_hours"]}
+        return {"status": "Absent", "hours": hours, "absent_hours": std_hours, **ot}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -448,7 +534,7 @@ def process_employee(employee, from_date, to_date,
 
     shift = get_shift_for_employee(employee, from_date, default_shift_name)
     saturday_mode = (shift.get("saturday_mode") or "Full Day") if shift else "Full Day"
-    working_days_list = get_working_days_in_range(from_date, to_date, saturday_mode)
+    holidays = get_holidays_in_range(employee, from_date, to_date)
 
     daily_checkins = group_checkins_by_date(
         checkin_list, shift,
@@ -464,27 +550,49 @@ def process_employee(employee, from_date, to_date,
     overtime_hours     = 0.0
     day_ot_hours       = 0.0
     night_ot_hours     = 0.0
+    weekend_ot_hours   = 0.0
+    holiday_ot_hours   = 0.0
     overtime_days      = 0
     invalid_days       = 0
     manual_review_days = 0
     remarks_list       = []
 
-    for work_date in working_days_list:
+    current = from_date
+    while current <= to_date:
+        work_date    = current
         day_shift    = get_shift_for_employee(employee, work_date, default_shift_name) or shift
         day_checkins = daily_checkins.get(work_date, [])
         is_saturday  = (work_date.weekday() == 5)
 
+        if work_date in holidays:
+            day_type = "holiday"
+        elif work_date.weekday() == 6:
+            day_type = "weekend"
+        elif is_saturday and saturday_mode == "Off":
+            current += timedelta(days=1)
+            continue
+        else:
+            day_type = "working"
+
         result = classify_day(day_checkins, day_shift or {}, doc_method, doc_missing_action,
-                               is_saturday=is_saturday)
+                               is_saturday=is_saturday, day_type=day_type)
 
         total_hours    += result["hours"]
         absent_hours   += result["absent_hours"]
         overtime_hours += result.get("overtime_hours", 0.0)
         day_ot_hours   += result.get("day_ot_hours", 0.0)
         night_ot_hours += result.get("night_ot_hours", 0.0)
+        weekend_ot_hours += result.get("weekend_ot_hours", 0.0)
+        holiday_ot_hours += result.get("holiday_ot_hours", 0.0)
 
         if result.get("overtime_hours", 0.0) > 0:
             overtime_days += 1
+
+        if day_type != "working":
+            # Weekly rest days and public holidays never count toward
+            # working days / absent days — only hours and OT are recorded.
+            current += timedelta(days=1)
+            continue
 
         if result["status"] == "Present":
             working_days += 1.0
@@ -501,6 +609,8 @@ def process_employee(employee, from_date, to_date,
             manual_review_days += 1
             remarks_list.append("{}: needs review".format(work_date))
 
+        current += timedelta(days=1)
+
     return {
         "working_days":        round(working_days, 1),
         "absent_days":         round(absent_days, 1),
@@ -510,6 +620,8 @@ def process_employee(employee, from_date, to_date,
         "overtime_hours":      round(overtime_hours, 2),
         "day_ot_hours":        round(day_ot_hours, 2),
         "night_ot_hours":      round(night_ot_hours, 2),
+        "weekend_ot_hours":    round(weekend_ot_hours, 2),
+        "holiday_ot_hours":    round(holiday_ot_hours, 2),
         "overtime_days":       overtime_days,
         "invalid_days":        invalid_days,
         "manual_review_days":  manual_review_days,
@@ -529,7 +641,7 @@ def get_employee_daily_breakdown(employee, from_date, to_date,
 
     shift = get_shift_for_employee(employee, from_date, default_shift_name)
     saturday_mode = (shift.get("saturday_mode") or "Full Day") if shift else "Full Day"
-    working_days_list = get_working_days_in_range(from_date, to_date, saturday_mode)
+    holidays = get_holidays_in_range(employee, from_date, to_date)
 
     daily_checkins = group_checkins_by_date(
         checkin_list, shift,
@@ -538,23 +650,39 @@ def get_employee_daily_breakdown(employee, from_date, to_date,
     )
 
     breakdown = []
-    for work_date in working_days_list:
+    current = from_date
+    while current <= to_date:
+        work_date    = current
         day_shift    = get_shift_for_employee(employee, work_date, default_shift_name) or shift or {}
         day_checkins = sorted(daily_checkins.get(work_date, []), key=lambda c: c["time"])
         is_saturday  = (work_date.weekday() == 5)
 
+        if work_date in holidays:
+            day_type = "holiday"
+        elif work_date.weekday() == 6:
+            day_type = "weekend"
+        elif is_saturday and saturday_mode == "Off":
+            current += timedelta(days=1)
+            continue
+        else:
+            day_type = "working"
+
         result = classify_day(day_checkins, day_shift, doc_method, doc_missing_action,
-                               is_saturday=is_saturday)
+                               is_saturday=is_saturday, day_type=day_type)
 
         breakdown.append({
-            "date":           str(work_date),
-            "weekday":        work_date.strftime("%A"),
-            "is_saturday":    is_saturday,
-            "status":         result["status"],
-            "hours":          result["hours"],
-            "overtime_hours": result.get("overtime_hours", 0.0),
-            "day_ot_hours":   result.get("day_ot_hours", 0.0),
-            "night_ot_hours": result.get("night_ot_hours", 0.0),
+            "date":             str(work_date),
+            "weekday":          work_date.strftime("%A"),
+            "is_saturday":      is_saturday,
+            "is_weekend":       day_type == "weekend",
+            "is_holiday":       day_type == "holiday",
+            "status":           result["status"],
+            "hours":            result["hours"],
+            "overtime_hours":   result.get("overtime_hours", 0.0),
+            "day_ot_hours":     result.get("day_ot_hours", 0.0),
+            "night_ot_hours":   result.get("night_ot_hours", 0.0),
+            "weekend_ot_hours": result.get("weekend_ot_hours", 0.0),
+            "holiday_ot_hours": result.get("holiday_ot_hours", 0.0),
             "checkins": [
                 {
                     "name":           c.get("name") or "",
@@ -568,6 +696,8 @@ def get_employee_daily_breakdown(employee, from_date, to_date,
                 for c in day_checkins
             ],
         })
+
+        current += timedelta(days=1)
 
     return breakdown
 

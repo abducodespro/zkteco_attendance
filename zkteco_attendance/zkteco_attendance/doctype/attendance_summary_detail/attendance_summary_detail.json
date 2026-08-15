@@ -17,6 +17,8 @@
   "overtime_hours",
   "day_ot_hours",
   "night_ot_hours",
+  "weekend_ot_hours",
+  "holiday_ot_hours",
   "overtime_days",
   "invalid_days",
   "manual_review_days",
@@ -114,13 +116,33 @@
    "fieldname": "day_ot_hours",
    "fieldtype": "Float",
    "label": "Day OT Hours",
-   "read_only": 1
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 1
   },
   {
    "fieldname": "night_ot_hours",
    "fieldtype": "Float",
    "label": "Night OT Hours",
-   "read_only": 1
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "weekend_ot_hours",
+   "fieldtype": "Float",
+   "label": "Weekend OT Hours",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "holiday_ot_hours",
+   "fieldtype": "Float",
+   "label": "Holiday OT Hours",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 1
   },
   {
    "fieldname": "overtime_days",

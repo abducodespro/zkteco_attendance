@@ -61,9 +61,17 @@ frappe.ui.form.on("Attendance Summary", {
 
         // ── Overtime summary indicator ─────────────────────────────────────
         if (frm.doc.status === "Completed" && frm.doc.total_overtime_hours) {
+            const parts = [
+                [__("Day"),     frm.doc.total_day_ot_hours],
+                [__("Night"),   frm.doc.total_night_ot_hours],
+                [__("Weekend"), frm.doc.total_weekend_ot_hours],
+                [__("Holiday"), frm.doc.total_holiday_ot_hours],
+            ].filter(([, v]) => v).map(([k, v]) => `${k}: ${v} hrs`).join(" | ");
+
             frm.dashboard.add_comment(
-                __("Total Overtime: <b>{0} hrs</b> across {1} employee(s).",
-                    [frm.doc.total_overtime_hours, frm.doc.total_employees || 0]),
+                __("Total Overtime: <b>{0} hrs</b> across {1} employee(s).{2}",
+                    [frm.doc.total_overtime_hours, frm.doc.total_employees || 0,
+                     parts ? `<br>${parts}` : ""]),
                 "orange",
                 true
             );

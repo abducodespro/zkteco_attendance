@@ -94,6 +94,38 @@
     cursor: help;
 }
 
+/* Overtime category chips (Day / Night / Weekend / Holiday) */
+.zk-ot-chip {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    margin: 1px;
+    border: 1px solid var(--border-color);
+    white-space: nowrap;
+    cursor: help;
+}
+
+.zk-ot-day     { color: var(--blue-700);    background: var(--blue-50);    border-color: var(--blue-200); }
+.zk-ot-night   { color: var(--purple-700);  background: var(--purple-50);  border-color: var(--purple-200); }
+.zk-ot-weekend { color: var(--orange-700);  background: var(--orange-50);  border-color: var(--orange-200); }
+.zk-ot-holiday { color: var(--red-700);     background: var(--red-50);     border-color: var(--red-200); }
+
+/* Day-type marks in the Date column (SAT / SUN / HOL) */
+.zk-day-mark {
+    font-size: 0.65rem;
+    font-weight: 600;
+    margin-left: 4px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+}
+
+.zk-day-weekend { color: var(--orange-700); background: var(--orange-50); border-color: var(--orange-200); }
+.zk-day-holiday { color: var(--red-700);    background: var(--red-50);    border-color: var(--red-200); }
+
 /* Saturday row subtle highlight */
 .zk-daily-table tr td:first-child .text-muted {
     font-size: 0.68rem;
