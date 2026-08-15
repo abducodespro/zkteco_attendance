@@ -9,6 +9,12 @@ and v16.
 
 ## 1. Installation
 
+### Create Necessary Fields at Employee
+```bash
+1. Label: Biometric Device                               Data Type: Link     Name: zk_biometric_device
+2. Label: Attendance Device ID (Biometric/RF tag ID)     Data Type: Data     Name: attendance_device_id
+```
+
 ### Fresh install
 ```bash
 cd frappe-bench
@@ -17,7 +23,7 @@ bench --site frappe.com install-app zkteco_attendance
 bench --site frappe.com migrate
 bench restart
 ```
-### Clean up if needed
+### To Uninstall and Clean up if needed
 ```bash
 bench --site frappe.com uninstall-app zkteco_attendance 2>/dev/null; true
 rm -rf ~/frappe-bench/apps/zkteco_attendance

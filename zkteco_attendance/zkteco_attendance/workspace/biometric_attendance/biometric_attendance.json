@@ -5,7 +5,7 @@
    "label": "Check-ins (Last 7 Days)"
   }
  ],
- "content": "[{\"type\":\"chart\",\"data\":{\"chart_name\":\"Check-ins (Last 7 Days)\",\"col\":12}},{\"type\":\"card\",\"data\":{\"card_name\":\"Device\",\"col\":4}},{\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Shifts &amp; Attendance</span>\",\"col\":12}},{\"type\":\"card\",\"data\":{\"card_name\":\"Shifts &amp; Attendance\",\"col\":4}},{\"type\":\"card\",\"data\":{\"card_name\":\"Attendace &amp; Payroll\",\"col\":4}}]",
+ "content": "[{\"type\":\"chart\",\"data\":{\"chart_name\":\"Check-ins (Last 7 Days)\",\"col\":12}},{\"type\":\"card\",\"data\":{\"card_name\":\"Setup\",\"col\":4}},{\"type\":\"card\",\"data\":{\"card_name\":\"Device\",\"col\":4}},{\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Shifts &amp; Attendance</span>\",\"col\":12}},{\"type\":\"card\",\"data\":{\"card_name\":\"Shifts &amp; Attendance\",\"col\":4}},{\"type\":\"card\",\"data\":{\"card_name\":\"Attendace &amp; Payroll\",\"col\":4}}]",
  "creation": "2024-01-01 00:00:00",
  "docstatus": 0,
  "doctype": "Workspace",
@@ -15,72 +15,6 @@
  "idx": 0,
  "label": "Biometric Attendance",
  "links": [
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Device",
-   "link_count": 3,
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Biometric Device",
-   "link_count": 0,
-   "link_to": "Biometric Device",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Attendance Sync Log",
-   "link_count": 0,
-   "link_to": "Attendance Sync Log",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Biometric Device Dashboard",
-   "link_count": 0,
-   "link_to": "zkteco-dashboard",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Shifts &amp; Attendance",
-   "link_count": 2,
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Shift Type",
-   "link_count": 0,
-   "link_to": "ZK Shift Type",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "ZK Shift Assignment",
-   "link_count": 0,
-   "link_to": "ZK Shift Assignment",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
   {
    "hidden": 0,
    "is_query_report": 0,
@@ -118,9 +52,103 @@
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Setup",
+   "link_count": 4,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Employee",
+   "link_count": 0,
+   "link_to": "Employee",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Biometric Device",
+   "link_count": 0,
+   "link_to": "Biometric Device",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Shift Type",
+   "link_count": 0,
+   "link_to": "ZK Shift Type",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Shift Assignment",
+   "link_count": 0,
+   "link_to": "ZK Shift Assignment",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Device",
+   "link_count": 2,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Attendance Sync Log",
+   "link_count": 0,
+   "link_to": "Attendance Sync Log",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Biometric Device Dashboard",
+   "link_count": 0,
+   "link_to": "zkteco-dashboard",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Shifts &amp; Attendance",
+   "link_count": 1,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Employee Checkins",
+   "link_count": 0,
+   "link_to": "Employee Checkin",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2026-06-06 23:33:27.108730",
+ "modified": "2026-08-14 23:13:01.050603",
  "modified_by": "Administrator",
  "module": "Zkteco Attendance",
  "name": "Biometric Attendance",
