@@ -9,26 +9,7 @@ and v16.
 
 ## 1. Installation
 
-### Create Necessary Fields at Employee
-```bash
-1. Label: Biometric Device                               Data Type: Link     Name: zk_biometric_device
-2. Label: Attendance Device ID (Biometric/RF tag ID)     Data Type: Data     Name: attendance_device_id
-```
-
 ### Fresh install
-```bash
-cd frappe-bench
-bench get-app https://github.com/abducodespro/zkteco_attendance
-bench --site frappe.com install-app zkteco_attendance
-bench --site frappe.com migrate
-bench restart
-```
-### To Uninstall and Clean up if needed
-```bash
-bench --site frappe.com uninstall-app zkteco_attendance 2>/dev/null; true
-rm -rf ~/frappe-bench/apps/zkteco_attendance
-sed -i '/zkteco_attendance/d' ~/frappe-bench/sites/apps.txt
-```
 
 Make sure the `pyzk` Python library is available (used to talk to the
 device over the network):
@@ -37,20 +18,42 @@ device over the network):
 pip install pyzk --break-system-packages
 ```
 
+```bash
+cd frappe-bench
+bench get-app https://github.com/abducodespro/zkteco_attendance
+bench --site frappe.com install-app zkteco_attendance
+bench --site frappe.com migrate
+bench restart
+```
+
+### To Uninstall and Clean up if needed
+```bash
+bench --site frappe.com uninstall-app zkteco_attendance 2>/dev/null; true
+rm -rf ~/frappe-bench/apps/zkteco_attendance
+sed -i '/zkteco_attendance/d' ~/frappe-bench/sites/apps.txt
+```
+
 Installation automatically:
 - Creates a **Biometric Device Manager** role
-- Adds a **Biometric Attendance ID** field to Employee
-- Adds **Biometric Device**, **ZK Device Record ID**, and **Overtime
-  Punch** fields to Employee Checkin
+- Adds **Biometric Device** (Link) and **Biometric Attendance ID** (Data)
+  fields to Employee
+- Adds **Biometric Device**, **ZK Device Record ID**, **Overtime Punch**,
+  and manual-edit tracking (**Manually Edited** / **Edited By** /
+  **Edited At**) fields to Employee Checkin
+- Adds the **Biometric Attendance** workspace with a **Check-ins
+  (Last 7 Days)** chart
+
+> The two Employee fields above are created automatically on install —
+> only create them yourself if you need them before installing the app.
 
 ---
 
 ## 2. Initial Setup
 
 ### 2.1 Map employees to the device
-On each **Employee** record, fill in **Biometric Device ID** and **Biometric Attendance ID** — this
-must match the User ID/Badge Number enrolled on the ZKTeco device for that
-person.
+On each **Employee** record, fill in **Biometric Device** and
+**Biometric Attendance ID** — the attendance ID must match the User
+ID/Badge Number enrolled on the ZKTeco device for that person.
 
 ### 2.2 Add a Biometric Device
 Go to **Biometric Device** (new) and fill in:
@@ -60,6 +63,7 @@ Go to **Biometric Device** (new) and fill in:
 | Device Name | Any label, must be unique |
 | Device IP / Port | Device's network address (default port 4370) |
 | Company | Company this device belongs to |
+| Device Time Zone | Informational only — for troubleshooting. Device timestamps are stored as-is (see Clock Offset below) |
 | Connection Password | Only if the device has a comm key/password set |
 | Status | Set to **Active** once configured |
 | Auto Sync Enabled / Sync Frequency | 5 Min / 15 Min / 30 Min / Hourly / Daily — for the background scheduler |
@@ -75,11 +79,15 @@ serial number, firmware, enrolled users, and stored log count.
 Create one or more **ZK Shift Type** records:
 
 - **Timing**: Start Time, End Time, Is Night Shift (for shifts crossing
-  midnight)
-- **Hours**: Full Day Hours, Half Day Hours, Standard Working Hours
-- **Calculation**: Working Hours Method (First IN–Last OUT or Actual Pairs),
-  Missing Check-In/Out Action (Mark Invalid / Present / Manual Review)
-- **Grace Periods**: Late Entry / Early Exit grace in minutes
+  midnight — early-morning checkouts are attributed to the previous day)
+- **Hours**: Full Day Minimum Hours, Half Day Minimum Hours, Standard
+  Daily Hours (used for absent-hours and day-overtime calculations)
+- **Calculation**: Working Hours Method (First IN–Last OUT or Actual
+  Pairs), Missing Check-In/Out Action (Mark Invalid / Present / Manual
+  Review), and Grace Periods (Late Entry / Early Exit in minutes)
+- **Saturday Configuration**: Saturday Working Mode (**Full Day** /
+  **Half Day** / **Off**) and Saturday Half Day Min Hours — Sundays are
+  always the weekly rest day
 - **Overtime Management** (optional, see section 5)
 
 ### 2.4 Assign shifts
@@ -129,15 +137,25 @@ attendance report for a date range:
 1. Create a new **Attendance Summary**, set **Company**, **From Date**,
    **To Date**, and optionally a default **Shift Type** (used as a fallback
    if an employee has no Shift Assignment).
-2. Click **Fetch Employees** — choose to fetch all active employees, or
+2. The **Processing Settings** section lets you override **Working Hours
+   Method** and **Missing Check-In/Out Action** for this summary; leave
+   blank to use each employee's shift settings.
+3. Click **Fetch Employees** — choose to fetch all active employees, or
    filter by Department / Designation / Project.
-3. Click **Process Attendance**. This runs in the background; the form
+4. Click **Process Attendance**. This runs in the background; the form
    polls automatically and reloads when done.
-4. Each row in **Details** shows: Working Days, Absent Days, Half Days,
-   Total Hours, Absent Hours, **Overtime Hours**, OT Days, Invalid Days, and
-   Manual Review flags.
-5. The summary totals show **Total Employees**, **Working Days in Period**,
-   and **Total Overtime Hours**.
+5. Each row in **Details** shows: Working Days, Absent Days, Half Days,
+   Total Hours, Absent Hours, **Overtime Hours** (split into **Day OT**,
+   **Night OT**, **Weekend OT**, **Holiday OT**), OT Days, Invalid Days,
+   and Manual Review flags.
+6. The summary totals show **Total Employees**, **Working Days in
+   Period**, **Total Overtime Hours**, and the Day / Night / Weekend /
+   Holiday OT subtotals.
+
+**Working days**: Monday–Friday are working days, Sunday is always the
+weekly rest day, and Saturday follows the shift's **Saturday Working Mode**
+(Full Day / Half Day / Off). Public holidays come from the employee's
+**Holiday List** (or the company default).
 
 **Working Hours Method**:
 - *First IN – Last OUT*: total span between the first and last punch of the
@@ -155,45 +173,70 @@ punch:
 
 ## 5. Overtime Management
 
-Enable overtime per shift on **ZK Shift Type** → **Overtime Management**
-section:
+Enable overtime per shift on **ZK Shift Type** → **Overtime Management**:
 
 - **Enable Overtime Calculation** — turns OT on for this shift.
-- **Overtime Calculation Method**:
-  - *After Standard Hours* — any hours worked beyond **Standard Working
-    Hours** count as OT.
-  - *After Shift End Time* — time worked past the shift's **End Time**
-    counts as OT.
-  - *OT Punches Only* — only explicit device OT In/Out punches (codes 4/5)
-    count as OT.
 - **OT Threshold (minutes)** — minimum extra time before OT is counted
   (avoids paying OT for a few minutes of rounding).
-- **Overtime Rate Multiplier** — reference value only; actual pay rules
-  belong in Payroll.
-- **Max OT Hours per Day** — optional daily cap (0 = no cap).
+- **Max OT Hours per Day** — optional daily cap (0 = no cap); when
+  exceeded, the cap is applied proportionally across OT categories.
 
-Resulting overtime hours/days appear automatically in **Attendance Summary
-Detail** and **Attendance Summary** after processing.
+Overtime is calculated from the actual worked hours (per the shift's
+Working Hours Method) using fixed clock windows, split into four explicit
+categories:
+
+| Category | Window | Rule |
+|---|---|---|
+| **Day OT** | 06:00–22:00 on working days | Hours in this window **beyond the Standard Daily Hours** |
+| **Night OT** | 22:00–06:00 (next day) on working days | All hours in this window |
+| **Weekend OT** | Sunday (weekly rest day), 00:00–24:00 | All hours worked |
+| **Holiday OT** | Official public holidays (Holiday List), 00:00–24:00 | All hours worked |
+
+So a guard who works 17:00→06:00 on a night shift gets their
+22:00–06:00 hours counted as Night OT, and anyone who works a Sunday or a
+public holiday is paid all of it as OT.
+
+> The **Overtime Calculation Method** and **Overtime Time Windows**
+> (Standard Shift Core Start / Night OT Start / Night OT End) fields on the
+> shift type are currently informational — the processor uses the fixed
+> windows in the table above.
+
+Device punches with code 4/5 (OT In/OT Out, if enabled on the device) are
+flagged as **Overtime Punch** checkins for visibility, but the OT hours
+themselves are computed from the clock windows above.
+
+Resulting overtime hours/days (Day / Night / Weekend / Holiday splits
+included) appear automatically in **Attendance Summary Detail** and
+**Attendance Summary** after processing.
 
 ---
 
-## 6. Employee Daily Checkins Dashboard
+## 6. Employee Daily Checkins Page
 
-From an **Attendance Summary** (with employees already fetched), click
-**View Daily Checkins** (under *View*) to open the **Employee Daily
-Checkins** dashboard for that summary.
+The **Employee Daily Checkins** page (searchable in the awesome bar, or
+from an **Attendance Summary** via **View Daily Checkins**) shows a
+per-employee, per-day breakdown of raw punches.
 
-- The dashboard's **Attendance Summary** field is pre-filled; changing it
-  loads a different summary's data.
-- **From Date** / **To Date** / **employees** are pulled directly from the
-  selected Attendance Summary.
-- Each employee appears as a collapsible card. Expanding it shows a table
-  with one row per day: date, weekday, status (Present / Half Day / Absent
-  / Invalid / Manual Review), total hours, overtime hours, and a chip for
-  every check-in (time + IN/OUT, with overtime punches highlighted).
+- **Standalone mode**: set **From Date** / **To Date** and click **Load**.
+  Employees mapped to a biometric device (Biometric Device + Biometric
+  Attendance ID set, Status Active) are fetched automatically.
+- Optionally link an **Attendance Summary** to pre-fill the dates and use
+  exactly the employees in that summary's Details.
+- Each employee appears as a collapsible card with a running OT total.
+  Expanding it shows a table with one row per day: date, weekday, status
+  (Present / Half Day / Absent / Invalid / Manual Review / Weekly Off /
+  Holiday), total hours, an **OT breakdown** (chips: **D**ay / **N**ight /
+  **W**eekend / **H**oliday), and a chip for every check-in (time + IN/OUT,
+  with overtime punches highlighted).
+- **Fix punches on the spot**: use the **+** button to add a check-in, or
+  the pencil icon to edit an existing one. Manually added/edited records
+  are marked with a ✎ badge (showing who edited and when) so they're easy
+  to spot before finalizing payroll.
 
 This is useful for spot-checking raw punches behind a Present/Absent/Half
 Day result before finalizing payroll.
+
+---
 
 ## 7. Dashboard & Workspace Chart
 
@@ -202,7 +245,8 @@ The **Biometric Attendance** workspace includes a built-in **Check-ins
 for the past week — refreshable from the chart's own menu like any other
 workspace chart.
 
-The **ZKTeco Dashboard** page (search for it in the awesome bar) shows:
+The **ZKTeco Dashboard** page (search for it in the awesome bar, or open it
+from the workspace's Device card) shows:
 
 - Total / Online / Offline device counts
 - Today's check-in count and failed syncs today
@@ -240,6 +284,9 @@ HR or System Manager access).
   stored logs, ensure your web server/reverse proxy timeout is generous
   (5–10 minutes), or use **Clear Device Logs After Sync** to keep device
   storage small.
+- **Overtime numbers look unexpected** — confirm the shift's **Standard
+  Daily Hours** and the fixed OT windows in section 5; OT is based on
+  clock-time windows, not on whether a punch was marked as overtime.
 - Check **Attendance Sync Log** for a history of every sync attempt and any
   error details.
 

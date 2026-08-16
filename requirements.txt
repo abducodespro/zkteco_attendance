@@ -1,2 +1,1 @@
 pyzk==0.9
-frappe
