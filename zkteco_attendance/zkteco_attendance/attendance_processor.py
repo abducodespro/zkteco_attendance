@@ -382,7 +382,7 @@ def calc_overtime_hours(day_checkins, shift, total_hours, day_type="working",
     """
     Calculate overtime hours for one day, split into four explicit categories:
       {
-        ot_hours:         total overtime hours,
+        overtime_hours:   total overtime hours,
         day_ot_hours:     hours in 06:00-22:00 on working days beyond the daily limit,
         night_ot_hours:   hours in 22:00-06:00 (next day) on working days,
         weekend_ot_hours: hours worked on the weekly rest day (Sunday),
@@ -397,7 +397,7 @@ def calc_overtime_hours(day_checkins, shift, total_hours, day_type="working",
       - weekend: every hour worked counts as weekend OT (00:00-24:00).
       - holiday: every hour worked counts as holiday OT (00:00-24:00).
     """
-    zero = {"ot_hours": 0.0, "day_ot_hours": 0.0, "night_ot_hours": 0.0,
+    zero = {"overtime_hours": 0.0, "day_ot_hours": 0.0, "night_ot_hours": 0.0,
             "weekend_ot_hours": 0.0, "holiday_ot_hours": 0.0}
     if not shift or not shift.get("enable_overtime"):
         return zero
@@ -437,7 +437,7 @@ def calc_overtime_hours(day_checkins, shift, total_hours, day_type="working",
         total_ot    = max_ot
 
     return {
-        "ot_hours":         round(total_ot, 2),
+        "overtime_hours":   round(total_ot, 2),
         "day_ot_hours":     round(day_ot,   2),
         "night_ot_hours":   round(night_ot, 2),
         "weekend_ot_hours": round(weekend_ot, 2),
@@ -476,7 +476,7 @@ def classify_day(day_checkins, shift, doc_method, doc_missing_action,
         half_hours = 0.1       # any attendance counts as half day
         std_hours  = std_hours / 2
 
-    empty_ot = {"ot_hours": 0.0, "day_ot_hours": 0.0, "night_ot_hours": 0.0,
+    empty_ot = {"overtime_hours": 0.0, "day_ot_hours": 0.0, "night_ot_hours": 0.0,
                 "weekend_ot_hours": 0.0, "holiday_ot_hours": 0.0}
 
     # No checkins at all
