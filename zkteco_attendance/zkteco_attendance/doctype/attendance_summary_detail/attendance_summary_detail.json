@@ -14,14 +14,18 @@
         "half_days",
         "total_working_hours",
         "absent_hours",
+        "overtime_sec",
         "overtime_hours",
         "day_ot_hours",
         "night_ot_hours",
+        "ot_col",
         "weekend_ot_hours",
         "holiday_ot_hours",
         "overtime_days",
+        "invalid_sec",
         "invalid_days",
         "manual_review_days",
+        "column_break_2",
         "remarks"
     ],
     "fields": [
