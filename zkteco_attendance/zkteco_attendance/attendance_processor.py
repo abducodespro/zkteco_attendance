@@ -240,22 +240,48 @@ def group_checkins_by_date(checkins, shift, default_method="First IN - Last OUT"
                             from_date=None, to_date=None):
     """
     Group a flat list of checkin dicts by attendance date.
-    Night shift logic: if shift is_night_shift, a checkout in the AM
-    belongs to the previous calendar day's shift.
+
+    Night shift logic (start_time > end_time, crossing midnight):
+      A punch belongs to the shift that started most recently before it.
+      This correctly groups cross-midnight punches — e.g. a 17:03 punch
+      on Day 1 and a 06:02 punch on Day 2 both land in Day 1's group.
+      A 60-minute buffer before the official shift start accommodates
+      early arrivals.
+
+    After grouping, night-shift labels are re-resolved so the first
+    chronological punch is always IN and the last is always OUT.
+
     Returns dict: { date -> [checkin, ...] }
     """
     from_date = getdate(from_date) if from_date else None
     to_date   = getdate(to_date)   if to_date   else None
+
+    is_night = bool(shift and shift.get("is_night_shift"))
+    start_t  = _coerce_time(shift.get("start_time") or "17:00:00") if is_night else None
+    end_t    = _coerce_time(shift.get("end_time") or "06:00:00") if is_night else None
+    crosses_midnight = (
+        is_night and start_t is not None and end_t is not None
+        and start_t > end_t
+    )
 
     daily = {}
     for c in checkins:
         dt = c["time"]
         att_date = dt.date()
 
-        if shift and shift.get("is_night_shift"):
-            # Checkins in early AM (before shift end) belong to previous date
-            end_str = str(shift.get("end_time") or "06:00:00")
-            end_t   = _coerce_time(end_str)
+        if crosses_midnight:
+            # A punch belongs to the shift whose start-time is the most
+            # recent shift-start ≤ punch time.  Allow a 60-minute buffer
+            # before the official start so early arrivals still land in
+            # the correct shift.
+            buffer = timedelta(minutes=60)
+            today_shift_start = datetime.combine(dt.date(), start_t)
+            if dt >= today_shift_start - buffer:
+                att_date = dt.date()
+            else:
+                att_date = (dt - timedelta(days=1)).date()
+        elif is_night:
+            # Night shift that doesn't cross midnight (unusual)
             if dt.time() <= end_t:
                 att_date = (dt - timedelta(days=1)).date()
 
@@ -267,7 +293,33 @@ def group_checkins_by_date(checkins, shift, default_method="First IN - Last OUT"
 
         daily.setdefault(att_date, []).append(c)
 
+    # For night shifts that cross midnight, re-resolve IN/OUT labels
+    # within each group so the first chronological punch is IN and the
+    # last is OUT — the stored labels may be swapped from the night
+    # shift perspective.
+    if crosses_midnight:
+        for att_date in list(daily.keys()):
+            daily[att_date] = _reresolve_night_shift_labels(daily[att_date])
+
     return daily
+
+
+def _reresolve_night_shift_labels(checkins):
+    """
+    For night-shift groups, re-resolve IN/OUT log types by alternating
+    chronologically (IN, OUT, IN, …).  This ensures the first punch
+    is always IN and the last is always OUT, regardless of how the
+    sync engine originally labelled them.
+    """
+    if len(checkins) <= 1:
+        return checkins
+    sorted_ci = sorted(checkins, key=lambda c: c["time"])
+    resolved = []
+    for i, c in enumerate(sorted_ci):
+        new_c = dict(c)  # shallow copy — preserves datetime objects
+        new_c["log_type"] = "IN" if i % 2 == 0 else "OUT"
+        resolved.append(new_c)
+    return resolved
 
 
 def _coerce_time(value):
@@ -903,7 +955,7 @@ def get_employee_daily_breakdown(employee, from_date, to_date,
 
 
 def get_daily_checkins_data(attendance_summary=None, from_date=None, to_date=None,
-                            employee_list=None, company=None):
+                            employee_list=None, company=None, biometric_device=None):
     """
     Build the full payload for the Daily Checkins dashboard.
 
@@ -913,8 +965,11 @@ def get_daily_checkins_data(attendance_summary=None, from_date=None, to_date=Non
     """
     if attendance_summary:
         doc = frappe.get_doc("Attendance Summary", attendance_summary)
-        from_date      = str(doc.from_date)
-        to_date        = str(doc.to_date)
+        # Use summary dates as defaults, but let user-provided dates win
+        if not from_date:
+            from_date = str(doc.from_date)
+        if not to_date:
+            to_date = str(doc.to_date)
         employee_list  = [row.employee for row in doc.details]
         company        = doc.company
         doc_method     = doc.working_hours_method
@@ -938,6 +993,8 @@ def get_daily_checkins_data(attendance_summary=None, from_date=None, to_date=Non
             }
             if company:
                 filters["company"] = company
+            if biometric_device:
+                filters["zk_biometric_device"] = biometric_device
             employee_list = [
                 e["name"]
                 for e in frappe.get_all("Employee", filters=filters, fields=["name"])
@@ -956,10 +1013,15 @@ def get_daily_checkins_data(attendance_summary=None, from_date=None, to_date=Non
 
     # Resolve employee names for standalone mode
     emp_info = {}
-    if not attendance_summary and employee_list:
+    if employee_list:
+        emp_filters = {"name": ["in", employee_list]}
+        if biometric_device:
+            emp_filters["zk_biometric_device"] = biometric_device
         rows = frappe.get_all("Employee",
-                              filters={"name": ["in", employee_list]},
-                              fields=["name", "employee_name", "department", "designation"])
+                              filters=emp_filters,
+                              fields=["name", "employee_name", "department",
+                                      "designation", "zk_biometric_device",
+                                      "attendance_device_id"])
         emp_info = {r.name: r for r in rows}
 
     employees = []
@@ -972,11 +1034,16 @@ def get_daily_checkins_data(attendance_summary=None, from_date=None, to_date=Non
             emp_name  = row.employee_name if row else emp_id
             dept      = row.department if row else ""
             desig     = row.designation if row else ""
+            info = emp_info.get(emp_id, {})
+            zk_device = getattr(row, 'zk_biometric_device', None) or info.get("zk_biometric_device") or ""
+            att_dev_id = getattr(row, 'attendance_device_id', None) or info.get("attendance_device_id") or ""
         else:
             info = emp_info.get(emp_id, {})
-            emp_name = info.get("employee_name") or emp_id
-            dept     = info.get("department") or ""
-            desig    = info.get("designation") or ""
+            emp_name  = info.get("employee_name") or emp_id
+            dept      = info.get("department") or ""
+            desig     = info.get("designation") or ""
+            zk_device = info.get("zk_biometric_device") or ""
+            att_dev_id = info.get("attendance_device_id") or ""
 
         days = get_employee_daily_breakdown(
             employee=emp_id,
@@ -988,11 +1055,13 @@ def get_daily_checkins_data(attendance_summary=None, from_date=None, to_date=Non
             doc_missing_action=doc_missing,
         )
         employees.append({
-            "employee":      emp_id,
-            "employee_name": emp_name,
-            "department":    dept,
-            "designation":   desig,
-            "days":          days,
+            "employee":             emp_id,
+            "employee_name":        emp_name,
+            "department":           dept,
+            "designation":          desig,
+            "zk_biometric_device":  zk_device,
+            "attendance_device_id": att_dev_id,
+            "days":                 days,
         })
 
     return {

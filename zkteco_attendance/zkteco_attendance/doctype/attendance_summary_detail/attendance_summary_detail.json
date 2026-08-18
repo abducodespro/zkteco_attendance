@@ -8,6 +8,8 @@
         "employee_name",
         "department",
         "designation",
+        "zk_biometric_device",
+        "attendance_device_id",
         "column_break_1",
         "working_days",
         "absent_days",
@@ -64,6 +66,21 @@
             "label": "Designation",
             "options": "Designation",
             "fetch_from": "employee.designation",
+            "read_only": 1
+        },
+        {
+            "fieldname": "zk_biometric_device",
+            "fieldtype": "Link",
+            "label": "ZK Biometric Device",
+            "options": "Biometric Device",
+            "fetch_from": "employee.zk_biometric_device",
+            "read_only": 1
+        },
+        {
+            "fieldname": "attendance_device_id",
+            "fieldtype": "Data",
+            "label": "Attendance Device ID",
+            "fetch_from": "employee.attendance_device_id",
             "read_only": 1
         },
         {

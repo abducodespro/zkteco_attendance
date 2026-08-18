@@ -40,31 +40,34 @@ def _emit_progress(device_name, user, stage, current=0, total=0, message="", ext
 def get_employee_by_biometric_id(user_id, company=None, device_name=None):
     """
     Find ERPNext Employee by biometric attendance ID (attendance_device_id).
-    If device_name is provided, prefer employees whose zk_biometric_device
-    matches this device first, then fall back to any match.
+    Requires BOTH attendance_device_id AND zk_biometric_device to be set
+    on the Employee — an employee without a mapped biometric device will
+    not match, preventing accidental checkin pulls for unmapped employees.
     """
-    base_filters = {"attendance_device_id": str(user_id), "status": "Active"}
+    if not device_name:
+        return None
+
+    base_filters = {
+        "attendance_device_id": str(user_id),
+        "zk_biometric_device": device_name,
+        "status": "Active",
+    }
     if company:
         base_filters["company"] = company
 
-    # Try device-scoped match first
-    if device_name:
-        device_filters = {**base_filters, "zk_biometric_device": device_name}
-        emps = frappe.get_all("Employee", filters=device_filters,
-                              fields=["name", "employee_name", "company"])
-        if emps:
-            return emps[0]
-
-    # Broad match (company scoped)
     emps = frappe.get_all("Employee", filters=base_filters,
                           fields=["name", "employee_name", "company"])
     if emps:
         return emps[0]
 
-    # Fallback: no company restriction
+    # Retry without company filter (same device required)
     if company:
         emps = frappe.get_all("Employee",
-                              filters={"attendance_device_id": str(user_id), "status": "Active"},
+                              filters={
+                                  "attendance_device_id": str(user_id),
+                                  "zk_biometric_device": device_name,
+                                  "status": "Active",
+                              },
                               fields=["name", "employee_name", "company"])
         if emps:
             return emps[0]

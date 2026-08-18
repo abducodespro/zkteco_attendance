@@ -3,7 +3,8 @@ import frappe
 
 @frappe.whitelist()
 def get_data(attendance_summary=None, from_date=None, to_date=None,
-             employee_list=None, company=None):
+             employee_list=None, company=None, biometric_device=None,
+             filter_employee=None):
     from zkteco_attendance.zkteco_attendance.api.endpoints import get_daily_checkins
     return get_daily_checkins(
         attendance_summary=attendance_summary,
@@ -11,6 +12,8 @@ def get_data(attendance_summary=None, from_date=None, to_date=None,
         to_date=to_date,
         employee_list=employee_list,
         company=company,
+        biometric_device=biometric_device,
+        filter_employee=filter_employee,
     )
 
 

@@ -142,7 +142,8 @@ def get_latest_sync_log(device_name):
 
 @frappe.whitelist()
 def get_daily_checkins(attendance_summary=None, from_date=None, to_date=None,
-                       employee_list=None, company=None):
+                       employee_list=None, company=None, biometric_device=None,
+                       filter_employee=None):
     """
     Return per-employee, per-day checkin breakdown.
     Accepts either an Attendance Summary name OR a direct date range + employee list.
@@ -162,12 +163,17 @@ def get_daily_checkins(attendance_summary=None, from_date=None, to_date=None,
         except Exception:
             employee_list = [e.strip() for e in employee_list.split(",") if e.strip()]
 
+    # filter_employee overrides employee_list if provided
+    if filter_employee:
+        employee_list = [filter_employee]
+
     return get_daily_checkins_data(
         attendance_summary=attendance_summary,
         from_date=from_date,
         to_date=to_date,
         employee_list=employee_list or None,
         company=company,
+        biometric_device=biometric_device,
     )
 
 
@@ -180,7 +186,8 @@ def save_manual_checkin(attendance_summary=None, employee=None, checkin_time=Non
     context (which also validates the employee belongs to the summary).
     Records edited_by / edited_at for audit trail.
     """
-    frappe.only_for(["System Manager", "HR Manager", "Biometric Device Manager"])
+    frappe.only_for(["System Manager", "HR Manager", "Biometric Device Manager",
+                    "Checkin Editor"])
 
     from zkteco_attendance.zkteco_attendance.attendance_processor import save_manual_checkin_record
 

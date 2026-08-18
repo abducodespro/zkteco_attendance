@@ -11,6 +11,7 @@ Run with: bench run-tests --app zkteco_attendance
 """
 
 import unittest
+from datetime import date, datetime
 from unittest.mock import patch
 
 import frappe
@@ -335,6 +336,244 @@ class TestGraceAndShiftOvertime(unittest.TestCase):
         self.assertAlmostEqual(result["overtime_hours"], 2.0, places=2)
         self.assertAlmostEqual(result["day_ot_hours"], 2.0, places=2)
         self.assertIn("late entry", result["remarks"])
+
+
+class TestNightShiftCrossMidnight(unittest.TestCase):
+    """
+    Night-shift checkins that cross midnight must be grouped as a single
+    attendance period.  The OUT at shift-start is treated as the IN, and
+    the IN at shift-end is treated as the OUT.
+    """
+
+    def test_night_shift_cross_midnight_grouping(self):
+        """Checkins across midnight land in the same attendance day."""
+        from zkteco_attendance.zkteco_attendance.attendance_processor import (
+            group_checkins_by_date,
+        )
+
+        shift = _day_shift(is_night_shift=1, start_time="17:00:00",
+                           end_time="06:00:00")
+
+        checkins = [
+            _mk_checkin("C1", "2026-01-01 06:01:00", "IN"),
+            _mk_checkin("C2", "2026-01-01 17:03:00", "OUT"),
+            _mk_checkin("C3", "2026-01-02 06:02:00", "IN"),
+            _mk_checkin("C4", "2026-01-02 17:04:00", "OUT"),
+        ]
+
+        daily = group_checkins_by_date(
+            checkins, shift,
+            from_date=date(2026, 1, 1), to_date=date(2026, 1, 2),
+        )
+
+        # 01/01 should contain the night-shift pair: 17:03 and next-day 06:02
+        self.assertIn(date(2026, 1, 1), daily)
+        day1 = sorted(daily[date(2026, 1, 1)], key=lambda c: c["time"])
+        self.assertEqual(len(day1), 2)
+        self.assertEqual(day1[0]["time"], datetime(2026, 1, 1, 17, 3))
+        self.assertEqual(day1[1]["time"], datetime(2026, 1, 2, 6, 2))
+
+        # Labels re-resolved: first punch = IN, last = OUT
+        self.assertEqual(day1[0]["log_type"], "IN")
+        self.assertEqual(day1[1]["log_type"], "OUT")
+
+        # 02/01 should contain the next night-shift start
+        self.assertIn(date(2026, 1, 2), daily)
+        day2 = daily[date(2026, 1, 2)]
+        self.assertEqual(len(day2), 1)
+        self.assertEqual(day2[0]["time"], datetime(2026, 1, 2, 17, 4))
+
+    @patch("zkteco_attendance.zkteco_attendance.attendance_processor.get_holidays_in_range")
+    @patch("zkteco_attendance.zkteco_attendance.attendance_processor.get_shift_for_employee")
+    def test_night_shift_hours_and_overtime(self, mock_shift, mock_holidays):
+        """Cross-midnight hours and OT are calculated correctly."""
+        from zkteco_attendance.zkteco_attendance.attendance_processor import process_employee
+
+        mock_shift.return_value = _day_shift(
+            is_night_shift=1, start_time="17:00:00", end_time="06:00:00",
+            overtime_calculation_method="After Shift End Time",
+            night_ot_start_time="01:00:00",
+            night_ot_end_time="06:00:00",
+        )
+        mock_holidays.return_value = set()
+
+        checkins = [
+            _mk_checkin("C1", "2026-01-01 06:01:00", "IN"),
+            _mk_checkin("C2", "2026-01-01 17:03:00", "OUT"),
+            _mk_checkin("C3", "2026-01-02 06:02:00", "IN"),
+            _mk_checkin("C4", "2026-01-02 17:04:00", "OUT"),
+        ]
+        result = process_employee(
+            employee="EMP-NIGHT",
+            from_date="2026-01-01",
+            to_date="2026-01-01",
+            checkin_list=checkins,
+            default_shift_name="Night Guard",
+            doc_method="First IN - Last OUT",
+            doc_missing_action="Mark as Invalid",
+        )
+
+        # 17:03 -> 06:02 = 12h 59min ≈ 12.98h total
+        self.assertAlmostEqual(result["total_working_hours"],
+                               12 + 59 / 60.0, places=1)
+        self.assertEqual(result["working_days"], 1.0)
+
+        # After Shift End Time: 17:03->01:00 regular, 01:00->06:02 night OT
+        self.assertAlmostEqual(result["night_ot_hours"], 5.0, places=1)
+
+    def test_night_shift_early_arrival_attributed_correctly(self):
+        """An employee arriving 5 minutes early is still in the same shift."""
+        from zkteco_attendance.zkteco_attendance.attendance_processor import (
+            group_checkins_by_date,
+        )
+
+        shift = _day_shift(is_night_shift=1, start_time="17:00:00",
+                           end_time="06:00:00")
+        checkins = [
+            _mk_checkin("C1", "2026-01-01 16:55:00", "IN"),
+            _mk_checkin("C2", "2026-01-02 06:02:00", "OUT"),
+        ]
+        daily = group_checkins_by_date(
+            checkins, shift,
+            from_date=date(2026, 1, 1), to_date=date(2026, 1, 2),
+        )
+
+        self.assertIn(date(2026, 1, 1), daily)
+        day1 = sorted(daily[date(2026, 1, 1)], key=lambda c: c["time"])
+        self.assertEqual(len(day1), 2)
+        self.assertEqual(day1[0]["time"], datetime(2026, 1, 1, 16, 55))
+        self.assertEqual(day1[1]["time"], datetime(2026, 1, 2, 6, 2))
+
+    def test_night_shift_late_exit_included(self):
+        """An employee leaving 30 minutes past shift end is still in the same shift."""
+        from zkteco_attendance.zkteco_attendance.attendance_processor import (
+            group_checkins_by_date,
+        )
+
+        shift = _day_shift(is_night_shift=1, start_time="17:00:00",
+                           end_time="06:00:00")
+        checkins = [
+            _mk_checkin("C1", "2026-01-01 17:00:00", "IN"),
+            _mk_checkin("C2", "2026-01-02 06:30:00", "OUT"),
+        ]
+        daily = group_checkins_by_date(
+            checkins, shift,
+            from_date=date(2026, 1, 1), to_date=date(2026, 1, 2),
+        )
+
+        self.assertIn(date(2026, 1, 1), daily)
+        day1 = sorted(daily[date(2026, 1, 1)], key=lambda c: c["time"])
+        self.assertEqual(len(day1), 2)
+        self.assertEqual(day1[1]["time"], datetime(2026, 1, 2, 6, 30))
+
+    def test_night_shift_grace_period(self):
+        """Late entry and early exit grace are computed across midnight."""
+        from zkteco_attendance.zkteco_attendance.attendance_processor import classify_day
+
+        shift = _day_shift(
+            is_night_shift=1, start_time="17:00:00", end_time="06:00:00",
+            late_entry_grace=10, early_exit_grace=10,
+        )
+        checkins = [
+            _mk_checkin("C1", "2026-01-01 17:20:00", "IN"),   # 10 min late beyond grace
+            _mk_checkin("C2", "2026-01-02 05:45:00", "OUT"),  # 15 min early beyond grace
+        ]
+        result = classify_day(checkins, shift, "First IN - Last OUT",
+                               "Mark as Invalid", work_date=date(2026, 1, 1))
+
+        self.assertTrue(result["is_late"])
+        self.assertTrue(result["is_early_exit"])
+        self.assertAlmostEqual(result["late_minutes"], 10.0, places=1)
+        self.assertAlmostEqual(result["early_minutes"], 5.0, places=1)
+
+    def test_night_shift_does_not_pair_with_next_day(self):
+        """The OUT punch at 17:04 on Day 2 is NOT consumed by Day 1's shift."""
+        from zkteco_attendance.zkteco_attendance.attendance_processor import (
+            group_checkins_by_date,
+        )
+
+        shift = _day_shift(is_night_shift=1, start_time="17:00:00",
+                           end_time="06:00:00")
+        checkins = [
+            _mk_checkin("C1", "2026-01-01 17:00:00", "IN"),
+            _mk_checkin("C2", "2026-01-02 06:00:00", "OUT"),
+            _mk_checkin("C3", "2026-01-02 17:00:00", "IN"),
+            _mk_checkin("C4", "2026-01-03 06:00:00", "OUT"),
+        ]
+        daily = group_checkins_by_date(
+            checkins, shift,
+            from_date=date(2026, 1, 1), to_date=date(2026, 1, 3),
+        )
+
+        # Day 1: 17:00 on 01/01 + 06:00 on 01/02
+        day1 = sorted(daily.get(date(2026, 1, 1), []), key=lambda c: c["time"])
+        self.assertEqual(len(day1), 2)
+        self.assertEqual(day1[0]["time"], datetime(2026, 1, 1, 17, 0))
+        self.assertEqual(day1[1]["time"], datetime(2026, 1, 2, 6, 0))
+
+        # Day 2: 17:00 on 01/02 + 06:00 on 01/03
+        day2 = sorted(daily.get(date(2026, 1, 2), []), key=lambda c: c["time"])
+        self.assertEqual(len(day2), 2)
+        self.assertEqual(day2[0]["time"], datetime(2026, 1, 2, 17, 0))
+        self.assertEqual(day2[1]["time"], datetime(2026, 1, 3, 6, 0))
+
+
+class TestNightShiftAcceptance(unittest.TestCase):
+    """
+    Exact acceptance test from the user's specification.
+    """
+
+    @patch("zkteco_attendance.zkteco_attendance.attendance_processor.get_holidays_in_range")
+    @patch("zkteco_attendance.zkteco_attendance.attendance_processor.get_shift_for_employee")
+    def test_user_acceptance_test(self, mock_shift, mock_holidays):
+        """
+        Check-ins:
+          01/01 06:01 IN, 01/01 17:03 OUT
+          02/01 06:02 IN, 02/01 17:04 OUT
+        Shift: 17:00 -> 06:00
+        Expected for 01/01:
+          IN  = 01/01 17:03
+          OUT = 02/01 06:02
+          Regular  = 17:03 -> 01:00 ≈ 8h
+          Night OT = 01:00 -> 06:02 ≈ 5h
+        """
+        from zkteco_attendance.zkteco_attendance.attendance_processor import process_employee
+
+        mock_shift.return_value = _day_shift(
+            is_night_shift=1,
+            start_time="17:00:00",
+            end_time="06:00:00",
+            standard_working_hours=8,
+            overtime_calculation_method="After Shift End Time",
+            night_ot_start_time="01:00:00",
+            night_ot_end_time="06:00:00",
+        )
+        mock_holidays.return_value = set()
+
+        checkins = [
+            _mk_checkin("C1", "2026-01-01 06:01:00", "IN"),
+            _mk_checkin("C2", "2026-01-01 17:03:00", "OUT"),
+            _mk_checkin("C3", "2026-01-02 06:02:00", "IN"),
+            _mk_checkin("C4", "2026-01-02 17:04:00", "OUT"),
+        ]
+
+        result = process_employee(
+            employee="EMP-NIGHT",
+            from_date="2026-01-01",
+            to_date="2026-01-01",
+            checkin_list=checkins,
+            default_shift_name="Night Guard",
+            doc_method="First IN - Last OUT",
+            doc_missing_action="Mark as Invalid",
+        )
+
+        # 17:03 -> 06:02 = 12h 59min ≈ 12.98h
+        self.assertAlmostEqual(result["total_working_hours"],
+                               12 + 59 / 60.0, places=1)
+        self.assertEqual(result["working_days"], 1.0)
+
+        # Night OT: 01:00 -> 06:02 = 5h 2min ≈ 5.03h
+        self.assertAlmostEqual(result["night_ot_hours"], 5.0, places=0)
 
 
 if __name__ == "__main__":
