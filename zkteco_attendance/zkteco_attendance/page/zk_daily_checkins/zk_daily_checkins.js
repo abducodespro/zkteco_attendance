@@ -128,11 +128,23 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
     // OT breakdown chips — Day / Night / Weekend / Holiday overtime
     function ot_cell(d) {
         const chips = [];
-        if (d.day_ot_hours)        chips.push(`<span class="zk-ot-chip zk-ot-day" title="${__("Day OT (06:00-22:00)")}" style="border: 1px solid #38684e; background-color: #8bf8c2; border-radius: 4px; padding: 2px 4px">D ${(d.day_ot_hours||0).toFixed(1)}</span>`);
-        if (d.night_ot_hours)      chips.push(`<span class="zk-ot-chip zk-ot-night" title="${__("Night OT (22:00-06:00)")}" style="border: 1px solid #5d6838; background-color: #d6f88b; border-radius: 4px; padding: 2px 4px">N ${(d.night_ot_hours||0).toFixed(1)}</span>`);
+        if (d.day_ot_hours)        chips.push(`<span class="zk-ot-chip zk-ot-day" title="${__("Day OT (after shift end)")}" style="border: 1px solid #38684e; background-color: #8bf8c2; border-radius: 4px; padding: 2px 4px">D ${(d.day_ot_hours||0).toFixed(1)}</span>`);
+        if (d.night_ot_hours)      chips.push(`<span class="zk-ot-chip zk-ot-night" title="${__("Night OT (night window)")}" style="border: 1px solid #5d6838; background-color: #d6f88b; border-radius: 4px; padding: 2px 4px">N ${(d.night_ot_hours||0).toFixed(1)}</span>`);
         if (d.weekend_ot_hours)    chips.push(`<span class="zk-ot-chip zk-ot-weekend" title="${__("Weekend OT (weekly rest day)")}" style="border: 1px solid #683848; background-color: #f88bc5; border-radius: 4px; padding: 2px 4px;">W ${(d.weekend_ot_hours||0).toFixed(1)}</span>`);
         if (d.holiday_ot_hours)    chips.push(`<span class="zk-ot-chip zk-ot-holiday" title="${__("Holiday OT (public holiday)")}" style="border: 1px solid #4a3868; background-color: #bc8bf8; border-radius: 4px; padding: 2px 4px;">H ${(d.holiday_ot_hours||0).toFixed(1)}</span>`);
         return chips.length ? chips.join(" ") : `<span class="text-muted">—</span>`;
+    }
+
+    // Late entry / early exit badges (beyond the shift's grace periods)
+    function grace_badges(d) {
+        const badges = [];
+        if (d.is_late) {
+            badges.push(`<span class="zk-grace-badge" title="${__("Late entry")}: ${d.late_minutes} ${__("min beyond grace")}" style="border:1px solid #b07a2a;background-color:#ffd98b;color:#7a5200;border-radius:4px;padding:1px 4px;margin-left:4px;font-size:0.7rem;">${__("LATE")}</span>`);
+        }
+        if (d.is_early_exit) {
+            badges.push(`<span class="zk-grace-badge" title="${__("Early exit")}: ${d.early_minutes} ${__("min beyond grace")}" style="border:1px solid #b07a2a;background-color:#ffd98b;color:#7a5200;border-radius:4px;padding:1px 4px;margin-left:4px;font-size:0.7rem;">${__("EARLY")}</span>`);
+        }
+        return badges.join("");
     }
 
     function render_checkin_chips(checkins, emp, date, summary_name) {
@@ -192,7 +204,7 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
                 <tr>
                     <td style="border: 1px solid #385068;">${frappe.datetime.str_to_user(d.date)}${dayMark}</td>
                     <td style="border: 1px solid #385068;">${__(d.weekday)}</td>
-                    <td style="border: 1px solid #385068;"><span class="indicator-pill ${status_color(d.status)}">${__(d.status)}</span></td>
+                    <td style="border: 1px solid #385068;"><span class="indicator-pill ${status_color(d.status)}">${__(d.status)}</span>${grace_badges(d)}</td>
                     <td class="text-right" style="border: 1px solid #385068;">${(d.hours||0).toFixed(2)}</td>
                     <td class="text-right ${d.overtime_hours ? 'text-warning' : ''}" style="border: 1px solid #385068;">${ot_cell(d)}</td>
                     <td style="border: 1px solid #385068;">${render_checkin_chips(d.checkins, emp.employee, d.date, summary_name)}</td>

@@ -169,6 +169,16 @@ punch:
 - *Mark as Present* — counted using available punches.
 - *Require Manual Review* — flagged, no hours counted.
 
+**Grace Periods** (per shift, on working days):
+- A first IN after **Start Time + Late Entry Grace** is a *late entry*; the
+  minutes beyond the grace are deducted from the day's working hours.
+- A last OUT before **End Time − Early Exit Grace** is an *early exit*; the
+  minutes beyond the grace are deducted from the day's working hours.
+- The deduction can drop the status **Present → Half Day → Absent**, and the
+  day is flagged **LATE / EARLY** on the Daily Checkins page and noted in the
+  summary's Remarks. Arriving early or leaving after the shift end never
+  counts against the employee.
+
 ---
 
 ## 5. Overtime Management
@@ -182,28 +192,36 @@ Enable overtime per shift on **ZK Shift Type** → **Overtime Management**:
   exceeded, the cap is applied proportionally across OT categories.
 
 Overtime is calculated from the actual worked hours (per the shift's
-Working Hours Method) using fixed clock windows, split into four explicit
-categories:
+Working Hours Method) and split into four explicit categories:
 
-| Category | Window | Rule |
-|---|---|---|
-| **Day OT** | 06:00–22:00 on working days | Hours in this window **beyond the Standard Daily Hours** |
-| **Night OT** | 22:00–06:00 (next day) on working days | All hours in this window |
-| **Weekend OT** | Sunday (weekly rest day), 00:00–24:00 | All hours worked |
-| **Holiday OT** | Official public holidays (Holiday List), 00:00–24:00 | All hours worked |
+| Category | Rule |
+|---|---|
+| **Day OT** | Working days — per the shift's **Overtime Calculation Method** (below) |
+| **Night OT** | Working days — hours inside the shift's **Night OT Start/End** window beyond the standard core |
+| **Weekend OT** | Sunday (weekly rest day), 00:00–24:00 — all hours worked |
+| **Holiday OT** | Official public holidays (Holiday List), 00:00–24:00 — all hours worked |
+
+The **Overtime Calculation Method** on the shift decides how working-day OT
+is measured:
+
+- **After Standard Hours** (default) — Day OT = day-window hours
+  (06:00–22:00) **beyond the Standard Daily Hours**; Night OT = night-window
+  hours (22:00–06:00 next day).
+- **After Shift End Time** — Day OT = hours worked **past the shift's End
+  Time**; Night OT = hours inside the shift's **Night OT Start Time / Night
+  OT End Time** window that fall **after the standard core** (Start Time +
+  Standard Daily Hours). Example: a guard on a 17:00→06:00 night shift with
+  8 standard hours gets the 01:00–06:00 tail counted as Night OT.
+- **OT Punches Only** — only explicit device OT punches (codes 4/5, if
+  enabled on the device) count as overtime.
+
+In every case the **OT Threshold (minutes)** is enforced — total OT at or
+below it is discarded (no OT for a few minutes of rounding) — and the
+**Max OT Hours per Day** cap is applied proportionally across categories.
 
 So a guard who works 17:00→06:00 on a night shift gets their
-22:00–06:00 hours counted as Night OT, and anyone who works a Sunday or a
-public holiday is paid all of it as OT.
-
-> The **Overtime Calculation Method** and **Overtime Time Windows**
-> (Standard Shift Core Start / Night OT Start / Night OT End) fields on the
-> shift type are currently informational — the processor uses the fixed
-> windows in the table above.
-
-Device punches with code 4/5 (OT In/OT Out, if enabled on the device) are
-flagged as **Overtime Punch** checkins for visibility, but the OT hours
-themselves are computed from the clock windows above.
+Night OT window hours counted as Night OT, and anyone who works a Sunday or
+a public holiday is paid all of it as OT.
 
 Resulting overtime hours/days (Day / Night / Weekend / Holiday splits
 included) appear automatically in **Attendance Summary Detail** and
@@ -284,9 +302,10 @@ HR or System Manager access).
   stored logs, ensure your web server/reverse proxy timeout is generous
   (5–10 minutes), or use **Clear Device Logs After Sync** to keep device
   storage small.
-- **Overtime numbers look unexpected** — confirm the shift's **Standard
-  Daily Hours** and the fixed OT windows in section 5; OT is based on
-  clock-time windows, not on whether a punch was marked as overtime.
+- **Overtime numbers look unexpected** — confirm the shift's **Overtime
+  Calculation Method** and its Standard Daily Hours / Night OT window in
+  section 5; OT is based on clock windows or the shift end time, not on
+  whether a punch was marked as overtime.
 - Check **Attendance Sync Log** for a history of every sync attempt and any
   error details.
 
