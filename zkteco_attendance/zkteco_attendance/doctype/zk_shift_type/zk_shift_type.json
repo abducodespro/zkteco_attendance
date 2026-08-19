@@ -19,6 +19,8 @@
   "standard_working_hours",
   "section_calc",
   "working_hours_method",
+  "column_lunch",
+  "lunch_break_hours",
   "missing_checkin_action",
   "column_grace",
   "late_entry_grace",
@@ -139,6 +141,18 @@
    "default": "First IN - Last OUT"
   },
   {
+   "fieldname": "column_lunch",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "lunch_break_hours",
+   "fieldtype": "Float",
+   "label": "Lunch Break (hours)",
+   "default": "0",
+   "depends_on": "eval:doc.working_hours_method=='First IN - Last OUT'",
+   "description": "Hours to deduct from total span when using First IN - Last OUT method. Example: 8:00-17:00 = 9h span, minus 1h lunch = 8h working hours."
+  },
+  {
    "fieldname": "missing_checkin_action",
    "fieldtype": "Select",
    "label": "Missing Check-In/Out Action",
@@ -229,6 +243,7 @@
    "fieldname": "night_ot_start_time",
    "fieldtype": "Time",
    "label": "Night OT Start Time",
+   "default": "22:00:00",
    "depends_on": "eval:doc.enable_overtime",
    "description": "The time after which night overtime begins on a night shift (e.g. 01:00 for a guard starting at 17:00 who hits 8 std hrs at 01:00)."
   },
@@ -236,6 +251,7 @@
    "fieldname": "night_ot_end_time",
    "fieldtype": "Time",
    "label": "Night OT End Time",
+   "default": "06:00:00",
    "depends_on": "eval:doc.enable_overtime",
    "description": "The checkout time that marks the end of night OT (e.g. 06:00). Hours between Night OT Start and this time count as night OT."
   },

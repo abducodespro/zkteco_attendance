@@ -421,6 +421,39 @@ class TestNightShiftCrossMidnight(unittest.TestCase):
         # After Shift End Time: 17:03->01:00 regular, 01:00->06:02 night OT
         self.assertAlmostEqual(result["night_ot_hours"], 5.0, places=1)
 
+    def test_night_ot_respects_custom_window_after_standard_hours(self):
+        """After Standard Hours method must honour the shift's configurable
+        Night OT Start / End time instead of the fixed 22:00-06:00 default.
+
+        Scenario: Guard shift 17:00-06:00, std 8 h.
+          night_ot_start_time = 01:00, night_ot_end_time = 06:00.
+          Employee works 17:00 -> 06:00 (13 h).
+          Expected night OT = 5 h (01:00-06:00), not 8 h (22:00-06:00).
+        """
+        from zkteco_attendance.zkteco_attendance.attendance_processor import calc_overtime_hours
+
+        shift = _day_shift(
+            is_night_shift=1,
+            start_time="17:00:00",
+            end_time="06:00:00",
+            overtime_calculation_method="After Standard Hours",
+            night_ot_start_time="01:00:00",
+            night_ot_end_time="06:00:00",
+        )
+        checkins = [
+            _mk_checkin("C1", "2026-01-01 17:00:00", "IN"),
+            _mk_checkin("C2", "2026-01-02 06:00:00", "OUT"),
+        ]
+        result = calc_overtime_hours(checkins, shift, total_hours=13.0,
+                                     method="First IN - Last OUT",
+                                     work_date=date(2026, 1, 1))
+
+        # night OT window 01:00-06:00 = 5 h
+        self.assertAlmostEqual(result["night_ot_hours"], 5.0, places=2)
+        # day OT window 06:00-22:00: worked 17:00-22:00 = 5 h; 5 - 8 std < 0 → 0
+        self.assertAlmostEqual(result["day_ot_hours"], 0.0, places=2)
+        self.assertAlmostEqual(result["overtime_hours"], 5.0, places=2)
+
     def test_night_shift_early_arrival_attributed_correctly(self):
         """An employee arriving 5 minutes early is still in the same shift."""
         from zkteco_attendance.zkteco_attendance.attendance_processor import (
@@ -574,6 +607,235 @@ class TestNightShiftAcceptance(unittest.TestCase):
 
         # Night OT: 01:00 -> 06:02 = 5h 2min ≈ 5.03h
         self.assertAlmostEqual(result["night_ot_hours"], 5.0, places=0)
+
+
+class TestLunchBreakDeduction(unittest.TestCase):
+    """Lunch break hours should be deducted from the First IN - Last OUT
+    total span so that e.g. 08:00-17:00 with 1h lunch = 8h, not 9h.
+    """
+
+    def test_lunch_break_deducts_from_first_last(self):
+        """1h lunch on 08:00-17:00 → 8h working hours."""
+        from zkteco_attendance.zkteco_attendance.attendance_processor import calc_working_hours
+
+        checkins = [
+            _mk_checkin("C1", "2026-08-10 08:00:00", "IN"),
+            _mk_checkin("C2", "2026-08-10 17:00:00", "OUT"),
+        ]
+        hours = calc_working_hours(checkins, "First IN - Last OUT",
+                                    lunch_break_hours=1.0)
+        self.assertAlmostEqual(hours, 8.0, places=2)
+
+    def test_lunch_break_zero_has_no_effect(self):
+        """lunch_break_hours=0 should behave like before (9h span)."""
+        from zkteco_attendance.zkteco_attendance.attendance_processor import calc_working_hours
+
+        checkins = [
+            _mk_checkin("C1", "2026-08-10 08:00:00", "IN"),
+            _mk_checkin("C2", "2026-08-10 17:00:00", "OUT"),
+        ]
+        hours = calc_working_hours(checkins, "First IN - Last OUT",
+                                    lunch_break_hours=0.0)
+        self.assertAlmostEqual(hours, 9.0, places=2)
+
+    def test_lunch_break_not_applied_to_actual_pairs(self):
+        """Lunch break should only affect First IN - Last OUT, not Actual Pairs."""
+        from zkteco_attendance.zkteco_attendance.attendance_processor import calc_working_hours
+
+        checkins = [
+            _mk_checkin("C1", "2026-08-10 08:00:00", "IN"),
+            _mk_checkin("C2", "2026-08-10 12:00:00", "OUT"),
+            _mk_checkin("C3", "2026-08-10 13:00:00", "IN"),
+            _mk_checkin("C4", "2026-08-10 17:00:00", "OUT"),
+        ]
+        hours = calc_working_hours(checkins, "Actual Pairs (IN-OUT)",
+                                    lunch_break_hours=1.0)
+        # 4h + 4h = 8h (lunch break not deducted for Actual Pairs)
+        self.assertAlmostEqual(hours, 8.0, places=2)
+
+    def test_lunch_break_reduces_overtime(self):
+        """8:00-17:00 with 1h lunch = 8h → no overtime instead of 1h."""
+        from zkteco_attendance.zkteco_attendance.attendance_processor import classify_day
+
+        shift = _day_shift(lunch_break_hours=1)
+        checkins = [
+            _mk_checkin("C1", "2026-08-10 08:00:00", "IN"),
+            _mk_checkin("C2", "2026-08-10 17:00:00", "OUT"),
+        ]
+        result = classify_day(checkins, shift, "First IN - Last OUT",
+                               "Mark as Invalid")
+
+        self.assertEqual(result["status"], "Present")
+        self.assertAlmostEqual(result["hours"], 8.0, places=2)
+        self.assertAlmostEqual(result["overtime_hours"], 0.0, places=2)
+
+    def test_lunch_break_zero_no_deduction(self):
+        """Without lunch break: 8:00-17:00 = 9h → 1h OT."""
+        from zkteco_attendance.zkteco_attendance.attendance_processor import classify_day
+
+        shift = _day_shift(lunch_break_hours=0)
+        checkins = [
+            _mk_checkin("C1", "2026-08-10 08:00:00", "IN"),
+            _mk_checkin("C2", "2026-08-10 17:00:00", "OUT"),
+        ]
+        result = classify_day(checkins, shift, "First IN - Last OUT",
+                               "Mark as Invalid")
+
+        self.assertEqual(result["status"], "Present")
+        self.assertAlmostEqual(result["hours"], 9.0, places=2)
+        self.assertAlmostEqual(result["overtime_hours"], 1.0, places=2)
+
+
+class TestSaturdayHalfDayMode(unittest.TestCase):
+    """Saturday Mode = Half Day should classify as Present when
+    the employee meets Saturday Half Day Min Hours, not always Half Day.
+    """
+
+    def test_saturday_half_day_meets_min_hours_is_present(self):
+        """Hours >= saturday_half_day_hours → Present, absent_hours = 0."""
+        from zkteco_attendance.zkteco_attendance.attendance_processor import classify_day
+
+        shift = _day_shift(
+            saturday_mode="Half Day",
+            saturday_half_day_hours=4,
+        )
+        # Saturday = 2026-08-15
+        checkins = [
+            _mk_checkin("C1", "2026-08-15 08:00:00", "IN"),
+            _mk_checkin("C2", "2026-08-15 12:30:00", "OUT"),
+        ]
+        result = classify_day(checkins, shift, "First IN - Last OUT",
+                               "Mark as Invalid", is_saturday=True,
+                               work_date=date(2026, 8, 15))
+
+        self.assertEqual(result["status"], "Present")
+        self.assertAlmostEqual(result["hours"], 4.5, places=2)
+        self.assertAlmostEqual(result["absent_hours"], 0.0, places=2)
+
+    def test_saturday_half_day_below_min_hours_is_half_day(self):
+        """Hours < saturday_half_day_hours → Half Day, absent_hours = 0."""
+        from zkteco_attendance.zkteco_attendance.attendance_processor import classify_day
+
+        shift = _day_shift(
+            saturday_mode="Half Day",
+            saturday_half_day_hours=4,
+        )
+        checkins = [
+            _mk_checkin("C1", "2026-08-15 08:00:00", "IN"),
+            _mk_checkin("C2", "2026-08-15 11:00:00", "OUT"),
+        ]
+        result = classify_day(checkins, shift, "First IN - Last OUT",
+                               "Mark as Invalid", is_saturday=True,
+                               work_date=date(2026, 8, 15))
+
+        self.assertEqual(result["status"], "Half Day")
+        self.assertAlmostEqual(result["hours"], 3.0, places=2)
+        self.assertAlmostEqual(result["absent_hours"], 0.0, places=2)
+
+    def test_saturday_half_day_no_checkins_is_absent(self):
+        """No checkins on Saturday Half Day → Absent."""
+        from zkteco_attendance.zkteco_attendance.attendance_processor import classify_day
+
+        shift = _day_shift(
+            saturday_mode="Half Day",
+            saturday_half_day_hours=4,
+        )
+        result = classify_day([], shift, "First IN - Last OUT",
+                               "Mark as Invalid", is_saturday=True,
+                               work_date=date(2026, 8, 15))
+
+        self.assertEqual(result["status"], "Absent")
+
+    @patch("zkteco_attendance.zkteco_attendance.attendance_processor.get_holidays_in_range")
+    @patch("zkteco_attendance.zkteco_attendance.attendance_processor.get_shift_for_employee")
+    def test_saturday_half_day_present_in_process_employee(self, mock_shift, mock_holidays):
+        """process_employee should count Saturday as Present (1.0) when
+        saturday_half_day_hours is met, not as 0.5 + 0.5 absent.
+        """
+        from zkteco_attendance.zkteco_attendance.attendance_processor import process_employee
+
+        mock_shift.return_value = _day_shift(
+            saturday_mode="Half Day",
+            saturday_half_day_hours=4,
+        )
+        mock_holidays.return_value = set()
+
+        # 2026-08-15 is Saturday
+        checkins = [
+            _mk_checkin("C1", "2026-08-15 08:00:00", "IN"),
+            _mk_checkin("C2", "2026-08-15 13:00:00", "OUT"),
+        ]
+        result = process_employee(
+            employee="HR-EMP-00001",
+            from_date="2026-08-15",
+            to_date="2026-08-15",
+            checkin_list=checkins,
+            default_shift_name=None,
+            doc_method="First IN - Last OUT",
+            doc_missing_action="Mark as Invalid",
+        )
+
+        self.assertEqual(result["working_days"], 1.0)
+        self.assertAlmostEqual(result["total_working_hours"], 5.0, places=2)
+
+
+class TestHolidayAsPresent(unittest.TestCase):
+    """Public holidays (from Holiday List) should count as Present
+    (paid day off), just like Sunday Weekly Off.
+    """
+
+    @patch("zkteco_attendance.zkteco_attendance.attendance_processor.get_holidays_in_range")
+    @patch("zkteco_attendance.zkteco_attendance.attendance_processor.get_shift_for_employee")
+    def test_holiday_no_checkins_counts_as_present(self, mock_shift, mock_holidays):
+        """A holiday with no checkins should count as Present (1.0), not Absent."""
+        from zkteco_attendance.zkteco_attendance.attendance_processor import process_employee
+
+        mock_shift.return_value = _day_shift()
+        mock_holidays.return_value = {date(2026, 8, 15)}  # Friday is a holiday
+
+        result = process_employee(
+            employee="HR-EMP-00001",
+            from_date="2026-08-15",
+            to_date="2026-08-15",
+            checkin_list=[],
+            default_shift_name=None,
+            doc_method="First IN - Last OUT",
+            doc_missing_action="Mark as Invalid",
+        )
+
+        # Holiday with no checkins → Present (paid day off), no absent hours
+        self.assertEqual(result["working_days"], 1.0)
+        self.assertAlmostEqual(result["absent_hours"], 0.0, places=2)
+        self.assertAlmostEqual(result["total_working_hours"], 0.0, places=2)
+
+    @patch("zkteco_attendance.zkteco_attendance.attendance_processor.get_holidays_in_range")
+    @patch("zkteco_attendance.zkteco_attendance.attendance_processor.get_shift_for_employee")
+    def test_holiday_with_checkins_counts_as_present(self, mock_shift, mock_holidays):
+        """A holiday with checkins should count as Present and all hours as Holiday OT."""
+        from zkteco_attendance.zkteco_attendance.attendance_processor import process_employee
+
+        mock_shift.return_value = _day_shift()
+        mock_holidays.return_value = {date(2026, 8, 15)}  # Friday is a holiday
+
+        checkins = [
+            _mk_checkin("C1", "2026-08-15 08:00:00", "IN"),
+            _mk_checkin("C2", "2026-08-15 16:00:00", "OUT"),
+        ]
+        result = process_employee(
+            employee="HR-EMP-00001",
+            from_date="2026-08-15",
+            to_date="2026-08-15",
+            checkin_list=checkins,
+            default_shift_name=None,
+            doc_method="First IN - Last OUT",
+            doc_missing_action="Mark as Invalid",
+        )
+
+        # Holiday with checkins → Present, all hours = Holiday OT
+        self.assertEqual(result["working_days"], 1.0)
+        self.assertAlmostEqual(result["total_working_hours"], 8.0, places=2)
+        self.assertAlmostEqual(result["holiday_ot_hours"], 8.0, places=2)
+        self.assertAlmostEqual(result["absent_hours"], 0.0, places=2)
 
 
 if __name__ == "__main__":

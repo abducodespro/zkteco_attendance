@@ -140,7 +140,7 @@ def count_working_days(from_date, to_date):
 SHIFT_FIELDS = [
     "name", "start_time", "end_time", "is_night_shift",
     "full_day_hours", "half_day_hours", "standard_working_hours",
-    "working_hours_method", "missing_checkin_action",
+    "working_hours_method", "lunch_break_hours", "missing_checkin_action",
     "late_entry_grace", "early_exit_grace",
     "saturday_mode", "saturday_half_day_hours",
     "enable_overtime", "overtime_calculation_method",
@@ -402,13 +402,17 @@ def _late_early_minutes(day_checkins, shift, work_date):
 # Working hours calculation
 # ─────────────────────────────────────────────────────────────────────────────
 
-def calc_hours_first_last(day_checkins):
-    """Method 1: Last checkout minus first checkin (total span)."""
+def calc_hours_first_last(day_checkins, lunch_break_hours=0.0):
+    """Method 1: Last checkout minus first checkin (total span).
+
+    When *lunch_break_hours* > 0 the span is reduced by that amount,
+    so e.g. 08:00-17:00 with a 1-hour lunch = 8 h instead of 9 h.
+    """
     if not day_checkins:
         return 0.0
     times = sorted(c["time"] for c in day_checkins)
-    delta = times[-1] - times[0]
-    return delta.total_seconds() / 3600
+    delta = (times[-1] - times[0]).total_seconds() / 3600
+    return max(0.0, delta - flt(lunch_break_hours))
 
 
 def calc_hours_actual_pairs(day_checkins):
@@ -429,10 +433,11 @@ def calc_hours_actual_pairs(day_checkins):
     return total
 
 
-def calc_working_hours(day_checkins, method="First IN - Last OUT"):
+def calc_working_hours(day_checkins, method="First IN - Last OUT",
+                       lunch_break_hours=0.0):
     if method == "Actual Pairs (IN-OUT)":
         return calc_hours_actual_pairs(day_checkins)
-    return calc_hours_first_last(day_checkins)
+    return calc_hours_first_last(day_checkins, lunch_break_hours=lunch_break_hours)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -636,8 +641,20 @@ def calc_overtime_hours(day_checkins, shift, total_hours, day_type="working",
         day_ot = _calc_ot_punches_only(day_checkins, method)
     else:
         intervals = _worked_intervals(day_checkins, method)
+        # Use the shift's configurable Night OT window; fall back to
+        # the fixed defaults when the fields are not set.
+        night_start_t = (
+            _coerce_time(shift.get("night_ot_start_time"))
+            if shift.get("night_ot_start_time")
+            else NIGHT_OT_START
+        )
+        night_end_t = (
+            _coerce_time(shift.get("night_ot_end_time"))
+            if shift.get("night_ot_end_time")
+            else NIGHT_OT_END
+        )
         day_win   = _window_hours(intervals, DAY_OT_START, DAY_OT_END)
-        night_win = _window_hours(intervals, NIGHT_OT_START, NIGHT_OT_END)
+        night_win = _window_hours(intervals, night_start_t, night_end_t)
         day_ot    = max(0.0, day_win - std_hours)
         night_ot  = night_win
 
@@ -691,6 +708,7 @@ def classify_day(day_checkins, shift, doc_method, doc_missing_action,
     std_hours  = flt(shift.get("standard_working_hours") or 8)
     method     = doc_method or shift.get("working_hours_method") or "First IN - Last OUT"
     missing    = doc_missing_action or shift.get("missing_checkin_action") or "Mark as Invalid"
+    lunch_break = flt(shift.get("lunch_break_hours") or 0)
 
     # Saturday overrides
     saturday_mode = shift.get("saturday_mode") or "Full Day"
@@ -722,7 +740,7 @@ def classify_day(day_checkins, shift, doc_method, doc_missing_action,
 
     if not (has_in and has_out):
         if missing == "Mark as Present":
-            hours = calc_working_hours(day_checkins, method)
+            hours = calc_working_hours(day_checkins, method, lunch_break_hours=lunch_break)
             late_min, early_min = _late_early_minutes(day_checkins, shift, work_date)
             eff_hours = max(0.0, hours - (late_min + early_min) / 60.0)
             ot = calc_overtime_hours(day_checkins, shift, eff_hours,
@@ -735,7 +753,7 @@ def classify_day(day_checkins, shift, doc_method, doc_missing_action,
         else:
             return {"status": "Invalid", "hours": 0.0, "absent_hours": 0.0, **empty_ot, **flags}
 
-    hours = calc_working_hours(day_checkins, method)
+    hours = calc_working_hours(day_checkins, method, lunch_break_hours=lunch_break)
     ot    = calc_overtime_hours(day_checkins, shift, hours, day_type=day_type, method=method,
                                 work_date=work_date)
 
@@ -752,8 +770,13 @@ def classify_day(day_checkins, shift, doc_method, doc_missing_action,
              "late_minutes": round(late_min, 1), "early_minutes": round(early_min, 1)}
 
     if is_saturday and saturday_mode == "Half Day":
-        # Saturday with any attendance → half day, no absent hours
-        return {"status": "Half Day", "hours": eff_hours, "absent_hours": 0.0, **ot, **flags}
+        # Saturday Half Day: if hours meet the minimum threshold → Present,
+        # otherwise → Half Day.  No absent hours since Saturday is optional.
+        sat_min = flt(shift.get("saturday_half_day_hours") or 4)
+        if eff_hours >= sat_min:
+            return {"status": "Present", "hours": eff_hours, "absent_hours": 0.0, **ot, **flags}
+        else:
+            return {"status": "Half Day", "hours": eff_hours, "absent_hours": 0.0, **ot, **flags}
 
     if eff_hours >= full_hours:
         return {"status": "Present", "hours": eff_hours, "absent_hours": 0.0, **ot, **flags}
@@ -836,9 +859,16 @@ def process_employee(employee, from_date, to_date,
         if result.get("overtime_hours", 0.0) > 0:
             overtime_days += 1
 
-        if day_type != "working":
-            # Weekly rest days and public holidays never count toward
-            # working days / absent days — only hours and OT are recorded.
+        if day_type == "weekend":
+            # Sunday (weekly rest day) never counts toward working / absent days.
+            current += timedelta(days=1)
+            continue
+
+        if day_type == "holiday":
+            # Public holidays count as a paid day off (Present) — same as
+            # Sunday Weekly Off but included in the working-days total so
+            # the employee is not penalised for an official holiday.
+            working_days += 1.0
             current += timedelta(days=1)
             continue
 
