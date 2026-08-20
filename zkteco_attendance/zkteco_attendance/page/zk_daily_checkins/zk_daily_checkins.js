@@ -142,7 +142,8 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
         const logtype = $(this).data("logtype");
         const summary = $(this).data("summary");
         const checkin = $(this).data("checkin-name");
-        show_checkin_dialog({ employee: emp, date, time, logtype, summary, checkin_name: checkin, mode: "edit" });
+        const ot      = $(this).data("is-overtime");
+        show_checkin_dialog({ employee: emp, date, time, logtype, summary, checkin_name: checkin, is_overtime: ot, mode: "edit" });
     });
 
     // ── Load / Clear buttons ──────────────────────────────────────────────
@@ -230,13 +231,14 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
                 manualBadge = `<span class="zk-manual-badge" title="${tip}">✎</span>`;
             }
             if (state.can_edit_checkins) {
-                editBtn = `<span class="zk-edit-checkin" title="${__("Edit")}""
+                editBtn = `<span class="zk-edit-checkin" title="${__("Edit")}"
                                 data-employee="${frappe.utils.escape_html(emp)}"
                                 data-date="${date}"
                                 data-time="${c.time}"
                                 data-logtype="${c.log_type}"
                                 data-idx="${idx}"
                                 data-checkin-name="${frappe.utils.escape_html(c.name || "")}"
+                                data-is-overtime="${c.is_overtime ? 1 : 0}"
                                 data-summary="${summary_attr}"
                                 style="cursor:pointer;margin-left:4px;opacity:0.6;">✎</span>`;
             }
@@ -370,11 +372,14 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
     }
 
     // ── Manual checkin dialog ─────────────────────────────────────────────
-    function show_checkin_dialog({ employee, date, time, logtype, summary, checkin_name, mode }) {
+    function show_checkin_dialog({ employee, date, time, logtype, summary, checkin_name, is_overtime, mode }) {
         const defaultTime = time || "08:00:00";
+        const isOT = is_overtime ? 1 : 0;
+
         const d = new frappe.ui.Dialog({
             title: mode === "edit" ? __("Edit Check-in") : __("Add Check-in"),
             fields: [
+                { fieldtype: "HTML", fieldname: "shift_info" },
                 { fieldtype: "Link", fieldname: "employee", label: __("Employee"),
                   options: "Employee", default: employee, read_only: 1 },
                 { fieldtype: "Date", fieldname: "checkin_date", label: __("Date"),
@@ -383,6 +388,8 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
                   default: defaultTime, reqd: 1 },
                 { fieldtype: "Select", fieldname: "log_type", label: __("Log Type"),
                   options: "IN\nOUT", default: logtype || "IN", reqd: 1 },
+                { fieldtype: "Check", fieldname: "is_overtime", label: __("Is Overtime"),
+                  default: isOT, description: __("Mark this punch as an overtime punch") },
             ],
             primary_action_label: mode === "edit" ? __("Update") : __("Save"),
             primary_action(vals) {
@@ -399,6 +406,7 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
                         checkin_time,
                         log_type:           vals.log_type,
                         checkin_name:       checkin_name || null,
+                        is_overtime:        vals.is_overtime ? 1 : 0,
                     },
                     freeze: true,
                     freeze_message: __("Saving…"),
@@ -413,6 +421,36 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
                             }, 4);
                             trigger_load();
                         }
+                    },
+                });
+            },
+            on_show() {
+                // Fetch and display the employee's shift info
+                frappe.call({
+                    method: "zkteco_attendance.zkteco_attendance.page.zk_daily_checkins.zk_daily_checkins.get_employee_shift_info",
+                    args: { employee, work_date: date },
+                    callback(r) {
+                        const s = r.message;
+                        if (!s) {
+                            d.fields_dict.shift_info.$wrapper.html(
+                                `<div class="text-muted" style="padding:4px 0 8px;font-size:0.82rem;">${__("No shift assigned")}</div>`
+                            );
+                            return;
+                        }
+                        const html = `
+                            <div style="background:var(--card-bg);border:1px solid var(--border-color);border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:0.82rem;">
+                                <b>${__("Shift")}:</b> ${frappe.utils.escape_html(s.name)}
+                                &nbsp;|&nbsp; <b>${__("Time")}:</b> ${s.start_time} – ${s.end_time}
+                                ${s.is_night_shift ? `<span class="text-warning"> (${__("Night Shift")})</span>` : ""}
+                                &nbsp;|&nbsp; <b>${__("Full Day")}:</b> ${s.full_day_hours}h
+                                &nbsp;|&nbsp; <b>${__("Half Day")}:</b> ${s.half_day_hours}h
+                                ${s.lunch_break_hours ? `&nbsp;|&nbsp; <b>${__("Lunch")}:</b> ${s.lunch_break_hours}h` : ""}
+                                <br>
+                                <b>${__("Standard Hours")}:</b> ${s.standard_working_hours}h
+                                &nbsp;|&nbsp; <b>${__("Saturday Mode")}:</b> ${s.saturday_mode}${s.saturday_mode === "Half Day" ? ` (${s.saturday_half_day_hours}h)` : ""}
+                                &nbsp;|&nbsp; <b>${__("OT")}:</b> ${s.enable_overtime ? s.overtime_calculation_method : __("Disabled")}
+                            </div>`;
+                        d.fields_dict.shift_info.$wrapper.html(html);
                     },
                 });
             },

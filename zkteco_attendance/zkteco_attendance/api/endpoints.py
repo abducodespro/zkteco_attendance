@@ -179,7 +179,7 @@ def get_daily_checkins(attendance_summary=None, from_date=None, to_date=None,
 
 @frappe.whitelist()
 def save_manual_checkin(attendance_summary=None, employee=None, checkin_time=None,
-                        log_type=None, checkin_name=None):
+                        log_type=None, checkin_name=None, is_overtime=0):
     """
     Add or update an Employee Checkin manually from the Daily Checkins dashboard.
     Works standalone (attendance_summary=None) or within an Attendance Summary
@@ -198,6 +198,7 @@ def save_manual_checkin(attendance_summary=None, employee=None, checkin_time=Non
             checkin_time=checkin_time,
             log_type=log_type,
             checkin_name=checkin_name,
+            is_overtime=is_overtime,
         )
 
     # Standalone: no Attendance Summary required
@@ -206,7 +207,17 @@ def save_manual_checkin(attendance_summary=None, employee=None, checkin_time=Non
         checkin_time=checkin_time,
         log_type=log_type,
         checkin_name=checkin_name,
+        is_overtime=is_overtime,
     )
+
+
+def get_employee_shift_info(employee, work_date=None):
+    """
+    Return the employee's shift details for a given date.
+    Used by the checkin dialog to display shift context.
+    """
+    from zkteco_attendance.zkteco_attendance.attendance_processor import get_employee_shift_info
+    return get_employee_shift_info(employee, work_date)
 
 
 @frappe.whitelist()

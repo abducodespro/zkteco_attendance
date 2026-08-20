@@ -27,7 +27,7 @@ Handles:
 
 import frappe
 from frappe import _
-from frappe.utils import getdate, get_datetime, nowdate, flt
+from frappe.utils import getdate, get_datetime, nowdate, flt, cint
 from datetime import date, datetime, timedelta, time
 from zkteco_attendance.zkteco_attendance.utils import has_column
 
@@ -72,17 +72,21 @@ def get_holiday_list_for_employee(employee):
 
 def get_holidays_in_range(employee, from_date, to_date):
     """
-    Return a set of dates that are official public holidays for the employee
-    within [from_date, to_date].
+    Return a dict ``{date: description}`` of official public holidays for
+    the employee within [from_date, to_date].
 
     Weekly-off entries in the Holiday child table (weekly_off = 1) are
     excluded — only true public holidays count as holiday overtime.
+
+    The dict supports ``date in holidays`` (key membership) for backward
+    compatibility and ``holidays[date]`` / ``holidays.get(date)`` to
+    retrieve the holiday description.
     """
     holiday_list = get_holiday_list_for_employee(employee)
     if not holiday_list:
-        return set()
+        return {}
     if not frappe.db.table_exists("Holiday"):
-        return set()
+        return {}
 
     filters = {
         "parent": holiday_list,
@@ -94,9 +98,9 @@ def get_holidays_in_range(employee, from_date, to_date):
     rows = frappe.db.get_all(
         "Holiday",
         filters=filters,
-        fields=["holiday_date"],
+        fields=["holiday_date", "description"],
     )
-    return {getdate(r.holiday_date) for r in rows}
+    return {getdate(r.holiday_date): (r.description or "") for r in rows}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -712,12 +716,6 @@ def classify_day(day_checkins, shift, doc_method, doc_missing_action,
 
     # Saturday overrides
     saturday_mode = shift.get("saturday_mode") or "Full Day"
-    if is_saturday and saturday_mode == "Half Day":
-        sat_min = flt(shift.get("saturday_half_day_hours") or 4)
-        # Saturday half-day: if any hours present → half day regardless of hours
-        full_hours = sat_min   # treat sat_min hours as "full" for Saturday
-        half_hours = 0.1       # any attendance counts as half day
-        std_hours  = std_hours / 2
 
     empty_ot = {"overtime_hours": 0.0, "day_ot_hours": 0.0, "night_ot_hours": 0.0,
                 "weekend_ot_hours": 0.0, "holiday_ot_hours": 0.0}
@@ -730,6 +728,9 @@ def classify_day(day_checkins, shift, doc_method, doc_missing_action,
             return {"status": "Holiday", "hours": 0.0, "absent_hours": 0.0, **empty_ot, **flags}
         if day_type == "weekend":
             return {"status": "Weekly Off", "hours": 0.0, "absent_hours": 0.0, **empty_ot, **flags}
+        if is_saturday and saturday_mode == "Half Day":
+            # Saturday Half Day, no checkins → Half Day (0.5 day credit)
+            return {"status": "Half Day", "hours": 0.0, "absent_hours": 0.0, **empty_ot, **flags}
         return {"status": "Absent", "hours": 0.0, "absent_hours": std_hours, **empty_ot, **flags}
 
     if work_date is None:
@@ -763,20 +764,28 @@ def classify_day(day_checkins, shift, doc_method, doc_missing_action,
     if day_type == "weekend":
         return {"status": "Present", "hours": hours, "absent_hours": 0.0, **ot, **flags}
 
+    # Saturday Half Day — no grace-period deduction; the employee just
+    # needs to meet the half-day-hours threshold.  Early exit / late
+    # entry penalties apply to full working days only.
+    if is_saturday and saturday_mode == "Half Day":
+        sat_min = flt(shift.get("saturday_half_day_hours") or 4)
+        sat_ot_hours = max(0.0, hours - sat_min)
+        sat_ot = {"overtime_hours": round(sat_ot_hours, 2),
+                  "day_ot_hours": round(sat_ot_hours, 2),
+                  "night_ot_hours": 0.0,
+                  "weekend_ot_hours": 0.0,
+                  "holiday_ot_hours": 0.0}
+        if hours >= sat_min:
+            return {"status": "Present", "hours": hours, "absent_hours": 0.0, **sat_ot, **flags}
+        else:
+            absent = max(0.0, sat_min - hours)
+            return {"status": "Half Day", "hours": hours, "absent_hours": absent, **sat_ot, **flags}
+
     # Working day — enforce the shift's grace periods
     late_min, early_min = _late_early_minutes(day_checkins, shift, work_date)
     eff_hours = max(0.0, hours - (late_min + early_min) / 60.0)
     flags = {"is_late": late_min > 0, "is_early_exit": early_min > 0,
              "late_minutes": round(late_min, 1), "early_minutes": round(early_min, 1)}
-
-    if is_saturday and saturday_mode == "Half Day":
-        # Saturday Half Day: if hours meet the minimum threshold → Present,
-        # otherwise → Half Day.  No absent hours since Saturday is optional.
-        sat_min = flt(shift.get("saturday_half_day_hours") or 4)
-        if eff_hours >= sat_min:
-            return {"status": "Present", "hours": eff_hours, "absent_hours": 0.0, **ot, **flags}
-        else:
-            return {"status": "Half Day", "hours": eff_hours, "absent_hours": 0.0, **ot, **flags}
 
     if eff_hours >= full_hours:
         return {"status": "Present", "hours": eff_hours, "absent_hours": 0.0, **ot, **flags}
@@ -876,8 +885,11 @@ def process_employee(employee, from_date, to_date,
             working_days += 1.0
         elif result["status"] == "Half Day":
             working_days += 0.5
-            absent_days  += 0.5
             half_days    += 1
+            # Saturday Half Day with no checkins: half-day credit, no absent
+            # Regular Half Day: half-day credit, half-day absent
+            if not (is_saturday and saturday_mode == "Half Day"):
+                absent_days += 0.5
         elif result["status"] == "Absent":
             absent_days  += 1.0
         elif result["status"] == "Invalid":
@@ -954,8 +966,10 @@ def get_employee_daily_breakdown(employee, from_date, to_date,
             "is_saturday":      is_saturday,
             "is_weekend":       day_type == "weekend",
             "is_holiday":       day_type == "holiday",
+            "holiday_name":     holidays.get(work_date, "") if day_type == "holiday" else "",
             "status":           result["status"],
             "hours":            result["hours"],
+            "effective_hours":  result["hours"],
             "is_late":          bool(result.get("is_late")),
             "is_early_exit":    bool(result.get("is_early_exit")),
             "late_minutes":     result.get("late_minutes", 0.0),
@@ -1103,7 +1117,8 @@ def get_daily_checkins_data(attendance_summary=None, from_date=None, to_date=Non
     }
 
 
-def save_manual_checkin_record(employee, checkin_time, log_type, checkin_name=None):
+def save_manual_checkin_record(employee, checkin_time, log_type,
+                            checkin_name=None, is_overtime=0):
     """
     Create or update an Employee Checkin manually, without needing an
     Attendance Summary (standalone Daily Checkins mode).
@@ -1118,12 +1133,15 @@ def save_manual_checkin_record(employee, checkin_time, log_type, checkin_name=No
 
     editor = frappe.session.user
     now    = _now()
+    ot_val = cint(is_overtime)
 
     if checkin_name and frappe.db.exists("Employee Checkin", checkin_name):
         # Update existing
         doc = frappe.get_doc("Employee Checkin", checkin_name)
         doc.time            = checkin_time
         doc.log_type        = log_type
+        if has_column("Employee Checkin", "is_overtime"):
+            doc.is_overtime   = ot_val
         doc.manually_edited = 1
         doc.edited_by       = editor
         doc.edited_at       = now
@@ -1133,7 +1151,7 @@ def save_manual_checkin_record(employee, checkin_time, log_type, checkin_name=No
     else:
         # Create new
         emp_doc = frappe.db.get_value("Employee", employee, ["employee_name"], as_dict=True)
-        doc = frappe.get_doc({
+        data = {
             "doctype":        "Employee Checkin",
             "employee":       employee,
             "employee_name":  emp_doc.employee_name if emp_doc else employee,
@@ -1142,7 +1160,37 @@ def save_manual_checkin_record(employee, checkin_time, log_type, checkin_name=No
             "manually_edited": 1,
             "edited_by":      editor,
             "edited_at":      now,
-        })
+        }
+        if has_column("Employee Checkin", "is_overtime"):
+            data["is_overtime"] = ot_val
+        doc = frappe.get_doc(data)
         doc.insert(ignore_permissions=True)
         frappe.db.commit()
         return {"name": doc.name, "action": "created"}
+
+
+def get_employee_shift_info(employee, work_date=None):
+    """
+    Return the employee's shift details for a given date.
+    Used by the checkin dialog to display shift context.
+    """
+    if not work_date:
+        from frappe.utils import nowdate
+        work_date = nowdate()
+    shift = get_shift_for_employee(employee, work_date)
+    if not shift:
+        return None
+    return {
+        "name":               shift.get("name") or "",
+        "start_time":         str(shift.get("start_time") or ""),
+        "end_time":           str(shift.get("end_time") or ""),
+        "is_night_shift":     bool(shift.get("is_night_shift")),
+        "full_day_hours":     flt(shift.get("full_day_hours") or 8),
+        "half_day_hours":     flt(shift.get("half_day_hours") or 4),
+        "standard_working_hours": flt(shift.get("standard_working_hours") or 8),
+        "lunch_break_hours":  flt(shift.get("lunch_break_hours") or 0),
+        "saturday_mode":      shift.get("saturday_mode") or "Full Day",
+        "saturday_half_day_hours": flt(shift.get("saturday_half_day_hours") or 4),
+        "enable_overtime":    bool(shift.get("enable_overtime")),
+        "overtime_calculation_method": shift.get("overtime_calculation_method") or "After Standard Hours",
+    }
