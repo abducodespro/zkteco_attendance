@@ -764,32 +764,43 @@ def classify_day(day_checkins, shift, doc_method, doc_missing_action,
     if day_type == "weekend":
         return {"status": "Present", "hours": hours, "absent_hours": 0.0, **ot, **flags}
 
-    # Saturday Half Day — no grace-period deduction; the employee just
-    # needs to meet the half-day-hours threshold.  Early exit / late
-    # entry penalties apply to full working days only.
+    # Saturday Half Day — no grace-period deduction and no lunch break
+    # deduction; the employee just needs to be present for the half-day
+    # hours threshold.  Early exit / late entry / lunch apply to full
+    # working days only.
     if is_saturday and saturday_mode == "Half Day":
         sat_min = flt(shift.get("saturday_half_day_hours") or 4)
-        sat_ot_hours = max(0.0, hours - sat_min)
+        # Recalculate without lunch deduction for Saturday threshold
+        raw_hours = calc_working_hours(day_checkins, method, lunch_break_hours=0)
+        sat_ot_hours = max(0.0, raw_hours - sat_min)
         sat_ot = {"overtime_hours": round(sat_ot_hours, 2),
                   "day_ot_hours": round(sat_ot_hours, 2),
                   "night_ot_hours": 0.0,
                   "weekend_ot_hours": 0.0,
                   "holiday_ot_hours": 0.0}
-        if hours >= sat_min:
-            return {"status": "Present", "hours": hours, "absent_hours": 0.0, **sat_ot, **flags}
+        if raw_hours >= sat_min:
+            return {"status": "Present", "hours": raw_hours, "absent_hours": 0.0, **sat_ot, **flags}
         else:
-            absent = max(0.0, sat_min - hours)
-            return {"status": "Half Day", "hours": hours, "absent_hours": absent, **sat_ot, **flags}
+            absent = max(0.0, sat_min - raw_hours)
+            return {"status": "Half Day", "hours": raw_hours, "absent_hours": absent, **sat_ot, **flags}
 
     # Working day — enforce the shift's grace periods
     late_min, early_min = _late_early_minutes(day_checkins, shift, work_date)
     eff_hours = max(0.0, hours - (late_min + early_min) / 60.0)
+
+    # For classification, use the raw span (before lunch deduction) so that
+    # full_day_hours / half_day_hours represent the time span the employee
+    # must cover, not net working time after lunch.  Lunch is a break and
+    # shouldn't penalise attendance status.
+    raw_hours = calc_working_hours(day_checkins, method, lunch_break_hours=0)
+    class_hours = max(0.0, raw_hours - (late_min + early_min) / 60.0)
+
     flags = {"is_late": late_min > 0, "is_early_exit": early_min > 0,
              "late_minutes": round(late_min, 1), "early_minutes": round(early_min, 1)}
 
-    if eff_hours >= full_hours:
+    if class_hours >= full_hours:
         return {"status": "Present", "hours": eff_hours, "absent_hours": 0.0, **ot, **flags}
-    elif eff_hours >= half_hours:
+    elif class_hours >= half_hours:
         return {"status": "Half Day", "hours": eff_hours, "absent_hours": std_hours / 2, **ot, **flags}
     else:
         return {"status": "Absent", "hours": eff_hours, "absent_hours": std_hours, **ot, **flags}

@@ -372,9 +372,52 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
     }
 
     // ── Manual checkin dialog ─────────────────────────────────────────────
+    function render_shift_html($wrapper, s) {
+        if (!s) {
+            $wrapper.html(
+                `<div class="text-muted" style="padding:4px 0 8px;font-size:0.82rem;">${__("No shift assigned")}</div>`
+            );
+            return;
+        }
+        $wrapper.html(`
+            <div style="background:var(--card-bg);border:1px solid var(--border-color);border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:0.82rem;">
+                <b>${__("Shift")}:</b> ${frappe.utils.escape_html(s.name)}
+                &nbsp;|&nbsp; <b>${__("Time")}:</b> ${s.start_time} – ${s.end_time}
+                ${s.is_night_shift ? `<span class="text-warning"> (${__("Night Shift")})</span>` : ""}
+                &nbsp;|&nbsp; <b>${__("Full Day")}:</b> ${s.full_day_hours}h
+                &nbsp;|&nbsp; <b>${__("Half Day")}:</b> ${s.half_day_hours}h
+                ${s.lunch_break_hours ? `&nbsp;|&nbsp; <b>${__("Lunch")}:</b> ${s.lunch_break_hours}h` : ""}
+                <br>
+                <b>${__("Standard Hours")}:</b> ${s.standard_working_hours}h
+                &nbsp;|&nbsp; <b>${__("Saturday Mode")}:</b> ${s.saturday_mode}${s.saturday_mode === "Half Day" ? ` (${s.saturday_half_day_hours}h)` : ""}
+                &nbsp;|&nbsp; <b>${__("OT")}:</b> ${s.enable_overtime ? s.overtime_calculation_method : __("Disabled")}
+            </div>`);
+    }
+
     function show_checkin_dialog({ employee, date, time, logtype, summary, checkin_name, is_overtime, mode }) {
         const defaultTime = time || "08:00:00";
         const isOT = is_overtime ? 1 : 0;
+
+        function get_shift_wrapper(dlg) {
+            // Prefer fields_dict, fall back to direct DOM query
+            if (dlg.fields_dict && dlg.fields_dict.shift_info && dlg.fields_dict.shift_info.$wrapper) {
+                return dlg.fields_dict.shift_info.$wrapper;
+            }
+            return dlg.$wrapper.find('.frappe-control[data-fieldname="shift_info"]');
+        }
+
+        function fetch_and_render_shift(dlg, emp, work_date) {
+            const $wrapper = get_shift_wrapper(dlg);
+            if (!$wrapper || !$wrapper.length) return;
+            frappe.call({
+                method: "zkteco_attendance.zkteco_attendance.page.zk_daily_checkins.zk_daily_checkins.get_employee_shift_info",
+                args: { employee: emp, work_date: work_date },
+                callback(r) {
+                    const $w = get_shift_wrapper(dlg);
+                    if ($w && $w.length) render_shift_html($w, r.message);
+                },
+            });
+        }
 
         const d = new frappe.ui.Dialog({
             title: mode === "edit" ? __("Edit Check-in") : __("Add Check-in"),
@@ -424,38 +467,12 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
                     },
                 });
             },
-            on_show() {
-                // Fetch and display the employee's shift info
-                frappe.call({
-                    method: "zkteco_attendance.zkteco_attendance.page.zk_daily_checkins.zk_daily_checkins.get_employee_shift_info",
-                    args: { employee, work_date: date },
-                    callback(r) {
-                        const s = r.message;
-                        if (!s) {
-                            d.fields_dict.shift_info.$wrapper.html(
-                                `<div class="text-muted" style="padding:4px 0 8px;font-size:0.82rem;">${__("No shift assigned")}</div>`
-                            );
-                            return;
-                        }
-                        const html = `
-                            <div style="background:var(--card-bg);border:1px solid var(--border-color);border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:0.82rem;">
-                                <b>${__("Shift")}:</b> ${frappe.utils.escape_html(s.name)}
-                                &nbsp;|&nbsp; <b>${__("Time")}:</b> ${s.start_time} – ${s.end_time}
-                                ${s.is_night_shift ? `<span class="text-warning"> (${__("Night Shift")})</span>` : ""}
-                                &nbsp;|&nbsp; <b>${__("Full Day")}:</b> ${s.full_day_hours}h
-                                &nbsp;|&nbsp; <b>${__("Half Day")}:</b> ${s.half_day_hours}h
-                                ${s.lunch_break_hours ? `&nbsp;|&nbsp; <b>${__("Lunch")}:</b> ${s.lunch_break_hours}h` : ""}
-                                <br>
-                                <b>${__("Standard Hours")}:</b> ${s.standard_working_hours}h
-                                &nbsp;|&nbsp; <b>${__("Saturday Mode")}:</b> ${s.saturday_mode}${s.saturday_mode === "Half Day" ? ` (${s.saturday_half_day_hours}h)` : ""}
-                                &nbsp;|&nbsp; <b>${__("OT")}:</b> ${s.enable_overtime ? s.overtime_calculation_method : __("Disabled")}
-                            </div>`;
-                        d.fields_dict.shift_info.$wrapper.html(html);
-                    },
-                });
-            },
         });
         d.show();
+        // Fetch shift info after dialog DOM is fully rendered
+        frappe.after_ajax(() => {
+            setTimeout(() => fetch_and_render_shift(d, employee, date), 150);
+        });
     }
 
     // ── Load logic ────────────────────────────────────────────────────────

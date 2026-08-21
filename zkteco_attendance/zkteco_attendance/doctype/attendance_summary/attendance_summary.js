@@ -115,9 +115,44 @@ frappe.ui.form.on("Attendance Summary", {
         (frm.doc.details || []).forEach(r => { employee_map[r.employee] = r.employee_name; });
         const emp_keys = Object.keys(employee_map);
 
+        function fetch_shift_info(dlg, employee, work_date) {
+            if (!employee) {
+                dlg.fields_dict.shift_info.$wrapper.html("");
+                return;
+            }
+            frappe.call({
+                method: "zkteco_attendance.zkteco_attendance.api.endpoints.get_employee_shift_info",
+                args: { employee: employee, work_date: work_date || frm.doc.from_date },
+                callback(r) {
+                    const s = r.message;
+                    if (!s) {
+                        dlg.fields_dict.shift_info.$wrapper.html(
+                            `<div class="text-muted" style="padding:4px 0 8px;font-size:0.82rem;">${__("No shift assigned")}</div>`
+                        );
+                        return;
+                    }
+                    const html = `
+                        <div style="background:var(--card-bg);border:1px solid var(--border-color);border-radius:6px;padding:8px 12px;margin-bottom:6px;font-size:0.82rem;">
+                            <b>${__("Shift")}:</b> ${frappe.utils.escape_html(s.name)}
+                            &nbsp;|&nbsp; <b>${__("Time")}:</b> ${s.start_time} – ${s.end_time}
+                            ${s.is_night_shift ? `<span class="text-warning"> (${__("Night Shift")})</span>` : ""}
+                            &nbsp;|&nbsp; <b>${__("Full Day")}:</b> ${s.full_day_hours}h
+                            &nbsp;|&nbsp; <b>${__("Half Day")}:</b> ${s.half_day_hours}h
+                            ${s.lunch_break_hours ? `&nbsp;|&nbsp; <b>${__("Lunch")}:</b> ${s.lunch_break_hours}h` : ""}
+                            <br>
+                            <b>${__("Standard Hours")}:</b> ${s.standard_working_hours}h
+                            &nbsp;|&nbsp; <b>${__("Saturday Mode")}:</b> ${s.saturday_mode}${s.saturday_mode === "Half Day" ? ` (${s.saturday_half_day_hours}h)` : ""}
+                            &nbsp;|&nbsp; <b>${__("OT")}:</b> ${s.enable_overtime ? s.overtime_calculation_method : __("Disabled")}
+                        </div>`;
+                    dlg.fields_dict.shift_info.$wrapper.html(html);
+                },
+            });
+        }
+
         const d = new frappe.ui.Dialog({
             title: __("Add Manual Check-in"),
             fields: [
+                { fieldtype: "HTML", fieldname: "shift_info" },
                 {
                     fieldtype: "Link",
                     fieldname: "employee",
@@ -127,6 +162,9 @@ frappe.ui.form.on("Attendance Summary", {
                         return { filters: { name: ["in", emp_keys] } };
                     },
                     reqd: 1,
+                    onchange() {
+                        fetch_shift_info(d, d.get_value("employee"), d.get_value("checkin_date"));
+                    },
                 },
                 { fieldtype: "Column Break" },
                 {
@@ -153,6 +191,14 @@ frappe.ui.form.on("Attendance Summary", {
                     default: "08:00:00",
                     reqd: 1,
                 },
+                { fieldtype: "Section Break" },
+                {
+                    fieldtype: "Check",
+                    fieldname: "is_overtime",
+                    label: __("Is Overtime"),
+                    default: 0,
+                    description: __("Mark this punch as an overtime punch"),
+                },
             ],
             primary_action_label: __("Save Check-in"),
             primary_action(vals) {
@@ -168,6 +214,7 @@ frappe.ui.form.on("Attendance Summary", {
                         employee:     vals.employee,
                         checkin_time: checkin_time,
                         log_type:     vals.log_type,
+                        is_overtime:  vals.is_overtime ? 1 : 0,
                     },
                     freeze: true,
                     freeze_message: __("Saving check-in…"),
@@ -182,6 +229,13 @@ frappe.ui.form.on("Attendance Summary", {
                         }
                     },
                 });
+            },
+            on_show() {
+                // Auto-fetch shift info if an employee is pre-selected
+                const emp = d.get_value("employee");
+                if (emp) {
+                    fetch_shift_info(d, emp, d.get_value("checkin_date"));
+                }
             },
         });
         d.show();
