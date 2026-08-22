@@ -146,7 +146,7 @@ SHIFT_FIELDS = [
     "full_day_hours", "half_day_hours", "standard_working_hours",
     "working_hours_method", "lunch_break_hours", "missing_checkin_action",
     "late_entry_grace", "early_exit_grace",
-    "saturday_mode", "saturday_half_day_hours",
+    "saturday_mode", "saturday_end_time", "saturday_half_day_hours",
     "enable_overtime", "overtime_calculation_method",
     "overtime_threshold_minutes",
     "max_overtime_hours_per_day",
@@ -353,6 +353,10 @@ def _shift_window_datetimes(shift, work_date):
     end_t   = _coerce_time(shift.get("end_time") or "17:00:00")
     start_dt = datetime.combine(work_date, start_t)
     end_dt   = datetime.combine(work_date, end_t)
+    if shift.get("saturday_mode") == "Half Day" and work_date.weekday() == 5:
+        # Saturday half-day end time is configurable; if not set, default to 06:00
+        saturday_end_t = _coerce_time(shift.get("saturday_end_time") or "12:00:00")
+        end_dt = datetime.combine(work_date, saturday_end_t)
     if shift.get("is_night_shift") or end_dt <= start_dt:
         end_dt = datetime.combine(work_date + timedelta(days=1), end_t)
     return start_dt, end_dt
@@ -545,7 +549,7 @@ def _calc_ot_after_shift_end(day_checkins, shift, method, work_date):
     """
     Overtime for working days per the 'After Shift End Time' method:
       - Day OT   : worked hours after the shift's End Time, excluding any that
-                   fall inside the Night OT window (avoids double counting).
+                   fall inside the Night OT window (avoids double counting). 
       - Night OT : worked hours inside the shift's Night OT Start/End window
                    that occur after the standard core ends
                    (Start Time + Standard Daily Hours).
@@ -659,14 +663,29 @@ def calc_overtime_hours(day_checkins, shift, total_hours, day_type="working",
         )
         day_win   = _window_hours(intervals, DAY_OT_START, DAY_OT_END)
         night_win = _window_hours(intervals, night_start_t, night_end_t)
-        day_ot    = max(0.0, day_win - std_hours)
+        # For First IN - Last OUT, the span includes lunch break time
+        # which should not count toward overtime.  Deduct lunch break
+        # so day_ot reflects actual worked hours beyond standard.
+        lunch_break = flt(shift.get("lunch_break_hours") or 0) if method == "First IN - Last OUT" else 0
+        day_ot    = max(0.0, day_win - std_hours - lunch_break)
         night_ot  = night_win
 
     total_ot = day_ot + night_ot + weekend_ot + holiday_ot
 
-    # Apply threshold (minimum extra minutes before OT is counted)
+    # Apply threshold — OT is counted only after the threshold period.
+    # If total OT is at or below the threshold, no OT is paid.
+    # Otherwise, the threshold is deducted proportionally from all
+    # OT categories so only the excess beyond the threshold counts.
     if total_ot <= threshold_hours:
         return zero
+
+    remaining = total_ot - threshold_hours
+    scale = remaining / total_ot if total_ot > 0 else 0
+    day_ot     *= scale
+    night_ot   *= scale
+    weekend_ot *= scale
+    holiday_ot *= scale
+    total_ot    = remaining
 
     # Apply daily cap (proportionally across categories)
     if max_ot and total_ot > max_ot:
@@ -764,25 +783,32 @@ def classify_day(day_checkins, shift, doc_method, doc_missing_action,
     if day_type == "weekend":
         return {"status": "Present", "hours": hours, "absent_hours": 0.0, **ot, **flags}
 
-    # Saturday Half Day — no grace-period deduction and no lunch break
-    # deduction; the employee just needs to be present for the half-day
-    # hours threshold.  Early exit / late entry / lunch apply to full
-    # working days only.
+    # Saturday Half Day — no lunch break deduction for the threshold
+    # (lunch doesn't count against the half-day presence requirement),
+    # but Late Entry Grace / Early Exit Grace DO apply so that a late
+    # arrival or early departure reduces effective hours.
     if is_saturday and saturday_mode == "Half Day":
         sat_min = flt(shift.get("saturday_half_day_hours") or 4)
-        # Recalculate without lunch deduction for Saturday threshold
+        # Span without lunch (lunch excluded from threshold comparison)
         raw_hours = calc_working_hours(day_checkins, method, lunch_break_hours=0)
-        sat_ot_hours = max(0.0, raw_hours - sat_min)
+        # Apply grace periods — late / early beyond grace reduce hours
+        late_min, early_min = _late_early_minutes(day_checkins, shift, work_date)
+        sat_class_hours = max(0.0, raw_hours - (late_min + early_min) / 60.0)
+
+        sat_ot_hours = max(0.0, sat_class_hours - sat_min)
         sat_ot = {"overtime_hours": round(sat_ot_hours, 2),
                   "day_ot_hours": round(sat_ot_hours, 2),
                   "night_ot_hours": 0.0,
                   "weekend_ot_hours": 0.0,
                   "holiday_ot_hours": 0.0}
-        if raw_hours >= sat_min:
-            return {"status": "Present", "hours": raw_hours, "absent_hours": 0.0, **sat_ot, **flags}
+        sat_flags = {"is_late": late_min > 0, "is_early_exit": early_min > 0,
+                     "late_minutes": round(late_min, 1),
+                     "early_minutes": round(early_min, 1)}
+        if sat_class_hours >= sat_min:
+            return {"status": "Present", "hours": sat_class_hours, "absent_hours": 0.0, **sat_ot, **sat_flags}
         else:
-            absent = max(0.0, sat_min - raw_hours)
-            return {"status": "Half Day", "hours": raw_hours, "absent_hours": absent, **sat_ot, **flags}
+            absent = max(0.0, sat_min - sat_class_hours)
+            return {"status": "Half Day", "hours": sat_class_hours, "absent_hours": absent, **sat_ot, **sat_flags}
 
     # Working day — enforce the shift's grace periods
     late_min, early_min = _late_early_minutes(day_checkins, shift, work_date)
