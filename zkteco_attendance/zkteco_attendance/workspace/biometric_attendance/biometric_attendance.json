@@ -155,7 +155,17 @@
  "parent_page": "",
  "public": 1,
  "quick_lists": [],
- "roles": [],
+ "roles": [
+    {
+            "role": "System Manager"
+        },
+        {
+            "role": "HR Manager"
+        },
+        {
+            "role": "Biometric Device Manager"
+        }
+ ],
  "sequence_id": 100.0,
  "shortcuts": [],
  "title": "Biometric Attendance"

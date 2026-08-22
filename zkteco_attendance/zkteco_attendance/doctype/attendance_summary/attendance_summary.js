@@ -54,10 +54,7 @@ frappe.ui.form.on("Attendance Summary", {
             }, __("View"));
 
             // ── Add Manual Check-in (requires Checkin Editor role) ────────
-            if (frappe.user_roles.includes("System Manager")
-                || frappe.user_roles.includes("HR Manager")
-                || frappe.user_roles.includes("Biometric Device Manager")
-                || frappe.user_roles.includes("Checkin Editor")) {
+            if (frappe.user_roles.includes("Checkin Editor")) {
                 frm.add_custom_button(__("Add Check-in"), function () {
                     frm.trigger("show_manual_checkin_dialog");
                 }, __("Actions"));

@@ -795,7 +795,12 @@ def classify_day(day_checkins, shift, doc_method, doc_missing_action,
         late_min, early_min = _late_early_minutes(day_checkins, shift, work_date)
         sat_class_hours = max(0.0, raw_hours - (late_min + early_min) / 60.0)
 
-        sat_ot_hours = max(0.0, sat_class_hours - sat_min)
+        # Overtime is calculated on the actual worked hours (after grace deductions) minus the minimum required for half-day credit.
+        overtime_threshold_minutes = flt(shift.get("overtime_threshold_minutes") or 0)
+        if (sat_class_hours - overtime_threshold_minutes / 60.0) > half_hours:
+            sat_ot_hours = max(0.0, sat_class_hours - half_hours)
+        else:
+            sat_ot_hours = 0.0
         sat_ot = {"overtime_hours": round(sat_ot_hours, 2),
                   "day_ot_hours": round(sat_ot_hours, 2),
                   "night_ot_hours": 0.0,

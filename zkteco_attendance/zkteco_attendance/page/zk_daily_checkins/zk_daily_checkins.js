@@ -19,10 +19,7 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
         employee_list:    [],
         biometric_device: null,
         filter_employee:  null,
-        can_edit_checkins: frappe.user_roles.includes("System Manager")
-                           || frappe.user_roles.includes("HR Manager")
-                           || frappe.user_roles.includes("Biometric Device Manager")
-                           || frappe.user_roles.includes("Checkin Editor"),
+        can_edit_checkins: frappe.user_roles.includes("Checkin Editor"),
     };
 
     // ── Filter bar ────────────────────────────────────────────────────────
@@ -190,10 +187,10 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
     function grace_badges(d) {
         const badges = [];
         if (d.is_late) {
-            badges.push(`<span class="zk-grace-badge" title="${__("Late entry")}: ${d.late_minutes} ${__("min beyond grace")}" style="border:1px solid #b07a2a;background-color:#ffd98b;color:#7a5200;border-radius:4px;padding:1px 4px;margin-left:4px;font-size:0.7rem;">${__("Late Entry")}</span>`);
+            badges.push(`<span class="zk-grace-badge" title="${__("Late entry")}: ${d.late_minutes} ${__("min beyond grace")}" style="border:1px solid #b07a2a;background-color:#ffd98b;color:#7a5200;border-radius:4px;padding:1px 4px;margin-left:4px;font-size:0.7rem;">${__("L Entry")}</span>`);
         }
         if (d.is_early_exit) {
-            badges.push(`<span class="zk-grace-badge" title="${__("Early exit")}: ${d.early_minutes} ${__("min beyond grace")}" style="border:1px solid #b07a2a;background-color:#ffd98b;color:#7a5200;border-radius:4px;padding:1px 4px;margin-left:4px;font-size:0.7rem;">${__("Early Exit")}</span>`);
+            badges.push(`<span class="zk-grace-badge" title="${__("Early exit")}: ${d.early_minutes} ${__("min beyond grace")}" style="border:1px solid #b07a2a;background-color:#ffd98b;color:#7a5200;border-radius:4px;padding:1px 4px;margin-left:4px;font-size:0.7rem;">${__("E Exit")}</span>`);
         }
         return badges.join("");
     }
