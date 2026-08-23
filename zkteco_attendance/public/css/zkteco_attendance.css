@@ -111,6 +111,8 @@
 .zk-ot-night   { color: var(--purple-700);  background: var(--purple-50);  border-color: var(--purple-200); }
 .zk-ot-weekend { color: var(--orange-700);  background: var(--orange-50);  border-color: var(--orange-200); }
 .zk-ot-holiday { color: var(--red-700);     background: var(--red-50);     border-color: var(--red-200); }
+.zk-ot-late     { color: var(--yellow-700);  background: var(--yellow-50);  border-color: var(--yellow-200); }
+.zk-ot-early    { color: var(--green-700);   background: var(--green-50);   border-color: var(--green-200); }
 
 /* Day-type marks in the Date column (SAT / SUN / HOL) */
 .zk-day-mark {
@@ -125,6 +127,14 @@
 
 .zk-day-weekend { color: var(--orange-700); background: var(--orange-50); border-color: var(--orange-200); }
 .zk-day-holiday { color: var(--red-700);    background: var(--red-50);    border-color: var(--red-200); }
+
+/* Shift info card in checkin dialog */
+.zk-shift-card {
+    transition: box-shadow 0.2s ease;
+}
+.zk-shift-card:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
 
 /* Ignored checkin chip */
 .zk-chip-ignored {

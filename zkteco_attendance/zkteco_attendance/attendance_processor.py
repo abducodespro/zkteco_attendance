@@ -358,7 +358,7 @@ def _shift_window_datetimes(shift, work_date):
     start_dt = datetime.combine(work_date, start_t)
     end_dt   = datetime.combine(work_date, end_t)
     if shift.get("saturday_mode") == "Half Day" and work_date.weekday() == 5:
-        # Saturday half-day end time is configurable; if not set, default to 06:00
+        # Saturday half-day end time is configurable; if not set, default to 12:00
         saturday_end_t = _coerce_time(shift.get("saturday_end_time") or "12:00:00")
         end_dt = datetime.combine(work_date, saturday_end_t)
     if shift.get("is_night_shift") or end_dt <= start_dt:

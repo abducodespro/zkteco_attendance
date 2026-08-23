@@ -34,12 +34,12 @@ sed -i '/zkteco_attendance/d' ~/frappe-bench/sites/apps.txt
 ```
 
 Installation automatically:
-- Creates a **Biometric Device Manager** role
+- Creates **Biometric Device Manager** and **Checkin Editor** roles
 - Adds **Biometric Device** (Link) and **Biometric Attendance ID** (Data)
   fields to Employee
 - Adds **Biometric Device**, **ZK Device Record ID**, **Overtime Punch**,
-  and manual-edit tracking (**Manually Edited** / **Edited By** /
-  **Edited At**) fields to Employee Checkin
+  manual-edit tracking (**Manually Edited** / **Edited By** /
+  **Edited At**), and **Ignored** fields to Employee Checkin
 - Adds the **Biometric Attendance** workspace with a **Check-ins
   (Last 7 Days)** chart
 
@@ -50,12 +50,18 @@ Installation automatically:
 
 ## 2. Initial Setup
 
-### 2.1 Map employees to the device
+### 2.1 Checkin Editor Role
+
+Assign the **Checkin Editor** role to users who should be able to add,
+edit, or ignore checkins from the Employee Daily Checkins page. Users
+without this role can view checkins but cannot modify them.
+
+### 2.2 Map employees to the device
 On each **Employee** record, fill in **Biometric Device** and
 **Biometric Attendance ID** — the attendance ID must match the User
 ID/Badge Number enrolled on the ZKTeco device for that person.
 
-### 2.2 Add a Biometric Device
+### 2.3 Add a Biometric Device
 Go to **Biometric Device** (new) and fill in:
 
 | Field | Notes |
@@ -75,7 +81,7 @@ Go to **Biometric Device** (new) and fill in:
 Click **Test Connection** to verify the device responds and to see its
 serial number, firmware, enrolled users, and stored log count.
 
-### 2.3 Set up Shift Types
+### 2.4 Set up Shift Types
 Create one or more **ZK Shift Type** records:
 
 - **Timing**: Start Time, End Time, Is Night Shift (for shifts crossing
@@ -90,7 +96,7 @@ Create one or more **ZK Shift Type** records:
   always the weekly rest day
 - **Overtime Management** (optional, see section 5)
 
-### 2.4 Assign shifts
+### 2.5 Assign shifts
 Use **ZK Shift Assignment** to assign a Shift Type to a group of employees
 for a date range (From Date / To Date, Status = Active).
 
@@ -247,9 +253,18 @@ per-employee, per-day breakdown of raw punches.
   **W**eekend / **H**oliday), and a chip for every check-in (time + IN/OUT,
   with overtime punches highlighted).
 - **Fix punches on the spot**: use the **+** button to add a check-in, or
-  the pencil icon to edit an existing one. Manually added/edited records
+  the ✎ icon to edit an existing one. Manually added/edited records
   are marked with a ✎ badge (showing who edited and when) so they're easy
   to spot before finalizing payroll.
+- **Ignore checkins**: use the **○** button to ignore a checkin — ignored
+  checkins are excluded from attendance processing (both the Daily Checkins
+  page and Attendance Summary). Ignored checkins appear visually
+  distinguished (dashed border, reduced opacity, strikethrough) and can be
+  unignored with the **⊘** button. This requires the **Checkin Editor**
+  role.
+- **Shift info in dialog**: when adding or editing a checkin, the dialog
+  displays a modern shift info card showing the assigned shift's timing,
+  hours, Saturday mode, overtime settings, and lunch break at a glance.
 
 This is useful for spot-checking raw punches behind a Present/Absent/Half
 Day result before finalizing payroll.
@@ -280,10 +295,18 @@ every 60 seconds.
 
 ## 8. Permissions
 
-Three roles can access this app's doctypes: **System Manager**, **HR
-Manager**, and **Biometric Device Manager** (created automatically on
-install — assign it to users who should manage devices/syncs without full
-HR or System Manager access).
+Four roles can access this app's doctypes:
+
+| Role | Access |
+|---|---|
+| **System Manager** | Full access to all features |
+| **HR Manager** | Full access to all features |
+| **Biometric Device Manager** | Manage devices, syncs, and attendance summaries |
+| **Checkin Editor** | Add, edit, and ignore checkins from the Daily Checkins page |
+
+**Biometric Device Manager** and **Checkin Editor** are created
+automatically on install. Assign them to users who need specific access
+without full HR or System Manager privileges.
 
 ---
 
@@ -306,6 +329,12 @@ HR or System Manager access).
   Calculation Method** and its Standard Daily Hours / Night OT window in
   section 5; OT is based on clock windows or the shift end time, not on
   whether a punch was marked as overtime.
+- **Ignore button not visible** — you need the **Checkin Editor** role to
+  see and use the ignore/edit/add buttons on checkin chips.
+- **Ignored checkin still affects attendance** — ignored checkins are
+  excluded from both the Daily Checkins page display and Attendance Summary
+  processing. If you see unexpected results, verify the checkin's ignored
+  status (dashed border, strikethrough chip) and unignore if needed.
 - Check **Attendance Sync Log** for a history of every sync attempt and any
   error details.
 

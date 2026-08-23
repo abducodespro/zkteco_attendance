@@ -217,10 +217,10 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
     function grace_badges(d) {
         const badges = [];
         if (d.is_late) {
-            badges.push(`<span class="zk-grace-badge" title="${__("Late entry")}: ${d.late_minutes} ${__("min beyond grace")}" style="border:1px solid #b07a2a;background-color:#ffd98b;color:#7a5200;border-radius:4px;padding:1px 4px;margin-left:4px;font-size:0.7rem;">${__("L Entry")}</span>`);
+            badges.push(`<span class="zk-grace-badge" title="${__("Late entry")}: ${d.late_minutes} ${__("min beyond grace")}" style="border:1px solid #b07a2a;background-color:#ffd98b;color:#7a5200;border-radius:4px;padding:1px 4px;margin-left:4px;font-size:0.7rem;">${__("L-EN")}</span>`);
         }
         if (d.is_early_exit) {
-            badges.push(`<span class="zk-grace-badge" title="${__("Early exit")}: ${d.early_minutes} ${__("min beyond grace")}" style="border:1px solid #b07a2a;background-color:#ffd98b;color:#7a5200;border-radius:4px;padding:1px 4px;margin-left:4px;font-size:0.7rem;">${__("E Exit")}</span>`);
+            badges.push(`<span class="zk-grace-badge" title="${__("Early exit")}: ${d.early_minutes} ${__("min beyond grace")}" style="border:1px solid #2ab06f;background-color:#ffd98b;color:#7a5200;border-radius:4px;padding:1px 4px;margin-left:4px;font-size:0.7rem;">${__("E-EX")}</span>`);
         }
         return badges.join("");
     }
@@ -342,10 +342,14 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
                         : ""}
                 </div>
                 <div class="text-muted" style="font-size:0.72rem;margin-top:4px;">
-                    ${__("OT legend")}: <span class="zk-ot-chip zk-ot-day">D ${__("Day")}</span>
-                    <span class="zk-ot-chip zk-ot-night">N ${__("Night")}</span>
-                    <span class="zk-ot-chip zk-ot-weekend">W ${__("Weekend")}</span>
-                    <span class="zk-ot-chip zk-ot-holiday">H ${__("Holiday")}</span>
+                    ${__("Abbreviations and Buttons")}: <span class="zk-ot-chip zk-ot-day">D ${__("Day")}</span>
+                    <span class="zk-ot-chip zk-ot-night">N: ${__("Night")}</span>
+                    <span class="zk-ot-chip zk-ot-weekend">W: ${__("Weekend")}</span>
+                    <span class="zk-ot-chip zk-ot-holiday">H: ${__("Holiday")}</span>
+                    <span class="zk-ot-chip zk-ot-late">L-EN: ${__("Late Entry")}</span>
+                    <span class="zk-ot-chip zk-ot-early">E-EX: ${__("Early Exit")}</span>
+                    <span class="zk-ot-chip zk-ot-night">○: ${__("Ignore Button")}</span>
+                    <span class="zk-ot-chip zk-ot-night">✎: ${__("Manual Edit Button")}</span>
                 </div>
             </div>`;
 
@@ -411,22 +415,106 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
     function render_shift_html($wrapper, s) {
         if (!s) {
             $wrapper.html(
-                `<div class="text-muted" style="padding:4px 0 8px;font-size:0.82rem;">${__("No shift assigned")}</div>`
+                `<div class="zk-shift-empty" style="padding:10px 0 8px;">
+                    <span class="text-muted" style="font-size:0.82rem;">${__("No shift assigned")}</span>
+                </div>`
             );
             return;
         }
+        const nightBadge = s.is_night_shift
+            ? `<span style="display:inline-flex;align-items:center;gap:3px;background:#fff3cd;color:#856404;border:1px solid #ffc107;border-radius:20px;padding:2px 10px;font-size:0.7rem;font-weight:600;margin-left:8px;"><i class="fa fa-moon-o"></i>${__("Night")}</span>`
+            : "";
+        const lunchHtml = s.lunch_break_hours
+            ? `<div style="display:flex;align-items:center;gap:6px;">
+                    <div style="width:6px;height:6px;border-radius:50%;background:#e0a800;flex-shrink:0;"></div>
+                    <span style="font-size:0.78rem;color:var(--text-muted);">${__("Lunch")}</span>
+                    <span style="font-size:0.82rem;font-weight:600;">${s.lunch_break_hours}h</span>
+               </div>`
+            : "";
+        const otHtml = s.enable_overtime
+            ? `<div style="display:flex;align-items:center;gap:6px;">
+                    <div style="width:6px;height:6px;border-radius:50%;background:var(--green-500);flex-shrink:0;"></div>
+                    <span style="font-size:0.78rem;color:var(--text-muted);">${__("Overtime")}</span>
+                    <span style="font-size:0.78rem;font-weight:600;color:var(--green-600);">${s.overtime_calculation_method}</span>
+               </div>`
+            : `<div style="display:flex;align-items:center;gap:6px;">
+                    <div style="width:6px;height:6px;border-radius:50%;background:var(--text-muted);flex-shrink:0;"></div>
+                    <span style="font-size:0.78rem;color:var(--text-muted);">${__("Overtime")}</span>
+                    <span style="font-size:0.78rem;color:var(--text-muted);">${__("Disabled")}</span>
+               </div>`;
+        const satLabel = s.saturday_mode === "Half Day"
+            ? `${s.saturday_mode} (${s.saturday_half_day_hours}h)`
+            : s.saturday_mode;
         $wrapper.html(`
-            <div style="background:var(--card-bg);border:1px solid var(--border-color);border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:0.82rem;">
-                <b>${__("Shift")}:</b> ${frappe.utils.escape_html(s.name)}
-                &nbsp;|&nbsp; <b>${__("Time")}:</b> ${s.start_time} – ${s.end_time}
-                ${s.is_night_shift ? `<span class="text-warning"> (${__("Night Shift")})</span>` : ""}
-                &nbsp;|&nbsp; <b>${__("Full Day")}:</b> ${s.full_day_hours}h
-                &nbsp;|&nbsp; <b>${__("Half Day")}:</b> ${s.half_day_hours}h
-                ${s.lunch_break_hours ? `&nbsp;|&nbsp; <b>${__("Lunch")}:</b> ${s.lunch_break_hours}h` : ""}
-                <br>
-                <b>${__("Standard Hours")}:</b> ${s.standard_working_hours}h
-                &nbsp;|&nbsp; <b>${__("Saturday Mode")}:</b> ${s.saturday_mode}${s.saturday_mode === "Half Day" ? ` (${s.saturday_half_day_hours}h)` : ""}
-                &nbsp;|&nbsp; <b>${__("OT")}:</b> ${s.enable_overtime ? s.overtime_calculation_method : __("Disabled")}
+            <div class="zk-shift-card" style="background:var(--card-bg);border:1px solid var(--border-color);border-radius:10px;padding:14px 16px;margin-bottom:10px;">
+                <!-- Header -->
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border-color);">
+                    <div style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#4facfe 0%,#00f2fe 100%);color:#fff;font-size:0.85rem;flex-shrink:0;">
+                        <i class="fa fa-clock-o"></i>
+                    </div>
+                    <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;">
+                        <span style="font-weight:700;font-size:0.88rem;color:var(--text-color);">${frappe.utils.escape_html(s.name)}</span>
+                        ${nightBadge}
+                    </div>
+                </div>
+                <!-- Grid -->
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px 16px;">
+                    <!-- Shift Time -->
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <div style="width:28px;height:28px;border-radius:6px;background:#e8f5e9;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                            <i class="fa fa-long-arrow-right" style="color:#2e7d32;font-size:0.75rem;"></i>
+                        </div>
+                        <div>
+                            <div style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">${__("Time")}</div>
+                            <div style="font-size:0.82rem;font-weight:600;">${s.start_time} – ${s.end_time}</div>
+                        </div>
+                    </div>
+                    <!-- Full Day -->
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <div style="width:28px;height:28px;border-radius:6px;background:#e3f2fd;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                            <i class="fa fa-sun-o" style="color:#1565c0;font-size:0.75rem;"></i>
+                        </div>
+                        <div>
+                            <div style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">${__("Full Day")}</div>
+                            <div style="font-size:0.82rem;font-weight:600;">${s.full_day_hours}h</div>
+                        </div>
+                    </div>
+                    <!-- Half Day -->
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <div style="width:28px;height:28px;border-radius:6px;background:#fce4ec;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                            <i class="fa fa-adjust" style="color:#c62828;font-size:0.75rem;"></i>
+                        </div>
+                        <div>
+                            <div style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">${__("Half Day")}</div>
+                            <div style="font-size:0.82rem;font-weight:600;">${s.half_day_hours}h</div>
+                        </div>
+                    </div>
+                    <!-- Standard Hours -->
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <div style="width:28px;height:28px;border-radius:6px;background:#f3e5f5;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                            <i class="fa fa-bullseye" style="color:#6a1b9a;font-size:0.75rem;"></i>
+                        </div>
+                        <div>
+                            <div style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">${__("Standard")}</div>
+                            <div style="font-size:0.82rem;font-weight:600;">${s.standard_working_hours}h</div>
+                        </div>
+                    </div>
+                    <!-- Saturday Mode -->
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <div style="width:28px;height:28px;border-radius:6px;background:#fff8e1;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                            <i class="fa fa-calendar-check-o" style="color:#f57f17;font-size:0.75rem;"></i>
+                        </div>
+                        <div>
+                            <div style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">${__("Saturday")}</div>
+                            <div style="font-size:0.82rem;font-weight:600;">${satLabel}</div>
+                        </div>
+                    </div>
+                    <!-- Lunch + OT (stacked in one cell) -->
+                    <div style="display:flex;flex-direction:column;gap:6px;justify-content:center;">
+                        ${lunchHtml}
+                        ${otHtml}
+                    </div>
+                </div>
             </div>`);
     }
 

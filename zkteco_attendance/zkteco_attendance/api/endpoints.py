@@ -240,6 +240,7 @@ def toggle_ignore_checkin(checkin_name):
     }
 
 
+@frappe.whitelist()
 def get_employee_shift_info(employee, work_date=None):
     """
     Return the employee's shift details for a given date.
