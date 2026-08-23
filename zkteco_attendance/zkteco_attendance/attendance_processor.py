@@ -207,12 +207,15 @@ def fetch_checkins(employee_list, from_date, to_date):
 
     has_overtime_col      = has_column("Employee Checkin", "is_overtime")
     has_manual_edited_col = has_column("Employee Checkin", "manually_edited")
+    has_ignored_col       = has_column("Employee Checkin", "zk_ignored")
 
     extra_select = ""
     if has_overtime_col:
         extra_select += ", is_overtime"
     if has_manual_edited_col:
         extra_select += ", manually_edited, edited_by, edited_at"
+    if has_ignored_col:
+        extra_select += ", zk_ignored"
 
     placeholders = ", ".join(["%s"] * len(employee_list))
     rows = frappe.db.sql("""
@@ -236,6 +239,7 @@ def fetch_checkins(employee_list, from_date, to_date):
             "manually_edited": bool(r.get("manually_edited")) if has_manual_edited_col else False,
             "edited_by":      r.get("edited_by") or "",
             "edited_at":      str(r.get("edited_at") or ""),
+            "ignored":        bool(r.get("zk_ignored")) if has_ignored_col else False,
         })
     return grouped
 
@@ -876,7 +880,9 @@ def process_employee(employee, from_date, to_date,
     while current <= to_date:
         work_date    = current
         day_shift    = get_shift_for_employee(employee, work_date, default_shift_name) or shift
-        day_checkins = daily_checkins.get(work_date, [])
+        all_day_checkins = daily_checkins.get(work_date, [])
+        # Filter out ignored checkins — they should not affect attendance processing
+        day_checkins = [c for c in all_day_checkins if not c.get("ignored", False)]
         is_saturday  = (work_date.weekday() == 5)
 
         if work_date in holidays:
@@ -986,7 +992,9 @@ def get_employee_daily_breakdown(employee, from_date, to_date,
     while current <= to_date:
         work_date    = current
         day_shift    = get_shift_for_employee(employee, work_date, default_shift_name) or shift or {}
-        day_checkins = sorted(daily_checkins.get(work_date, []), key=lambda c: c["time"])
+        all_day_checkins = sorted(daily_checkins.get(work_date, []), key=lambda c: c["time"])
+        # Filter out ignored checkins — they should not affect attendance processing
+        day_checkins = [c for c in all_day_checkins if not c.get("ignored", False)]
         is_saturday  = (work_date.weekday() == 5)
 
         if work_date in holidays:
@@ -1030,8 +1038,9 @@ def get_employee_daily_breakdown(employee, from_date, to_date,
                     "manually_edited": bool(c.get("manually_edited")),
                     "edited_by":      c.get("edited_by") or "",
                     "edited_at":      c.get("edited_at") or "",
+                    "ignored":        bool(c.get("ignored")),
                 }
-                for c in day_checkins
+                for c in all_day_checkins
             ],
         })
 

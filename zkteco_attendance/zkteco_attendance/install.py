@@ -16,6 +16,7 @@ def after_install():
     _add_employee_checkin_zk_uid_field()
     _add_employee_checkin_overtime_field()
     _add_employee_checkin_manual_fields()
+    _add_employee_checkin_ignored_field()
     frappe.db.commit()
     frappe.msgprint(_("ZKTeco Attendance installed successfully."))
 
@@ -223,5 +224,26 @@ def _add_employee_checkin_overtime_field():
         "description": "Set when this checkin was recorded as an Overtime In/Out punch (device punch code 4/5).",
         "in_list_view": 1,
         "no_copy": 1,
+    })
+    cf.insert(ignore_permissions=True)
+
+
+def _add_employee_checkin_ignored_field():
+    """Add ignored checkbox to Employee Checkin to exclude checkins from attendance processing."""
+    if _field_exists("Employee Checkin", "zk_ignored"):
+        return
+
+    after = "is_overtime" if _field_exists("Employee Checkin", "is_overtime") else "log_type"
+
+    cf = frappe.get_doc({
+        "doctype": "Custom Field",
+        "dt": "Employee Checkin",
+        "module": "Zkteco Attendance",
+        "label": "Ignored",
+        "fieldname": "zk_ignored",
+        "fieldtype": "Check",
+        "insert_after": after,
+        "description": "Set when this checkin should be excluded from attendance processing.",
+        "in_list_view": 0,
     })
     cf.insert(ignore_permissions=True)

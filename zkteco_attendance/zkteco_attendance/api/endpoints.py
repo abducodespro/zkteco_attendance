@@ -211,6 +211,35 @@ def save_manual_checkin(attendance_summary=None, employee=None, checkin_time=Non
     )
 
 
+@frappe.whitelist()
+def toggle_ignore_checkin(checkin_name):
+    """
+    Toggle the 'ignored' flag on an Employee Checkin.
+    Ignored checkins are excluded from attendance processing.
+    """
+    frappe.only_for(["System Manager", "HR Manager", "Biometric Device Manager",
+                    "Checkin Editor"])
+
+    from zkteco_attendance.zkteco_attendance.utils import has_column
+
+    if not checkin_name or not frappe.db.exists("Employee Checkin", checkin_name):
+        frappe.throw(_("Invalid checkin record."))
+
+    if not has_column("Employee Checkin", "zk_ignored"):
+        frappe.throw(_("The ignored field is not available. Please run the latest patch."))
+
+    doc = frappe.get_doc("Employee Checkin", checkin_name)
+    current_val = bool(doc.get("zk_ignored"))
+    doc.db_set("zk_ignored", 0 if current_val else 1, update_modified=False)
+    frappe.db.commit()
+
+    return {
+        "name": checkin_name,
+        "ignored": not current_val,
+        "action": "unignored" if current_val else "ignored",
+    }
+
+
 def get_employee_shift_info(employee, work_date=None):
     """
     Return the employee's shift details for a given date.

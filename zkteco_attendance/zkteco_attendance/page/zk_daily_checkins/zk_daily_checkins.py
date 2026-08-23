@@ -27,6 +27,12 @@ def save_manual_checkin(attendance_summary=None, employee=None, checkin_time=Non
 
 
 @frappe.whitelist()
+def toggle_ignore_checkin(checkin_name):
+    from zkteco_attendance.zkteco_attendance.api.endpoints import toggle_ignore_checkin as _toggle
+    return _toggle(checkin_name=checkin_name)
+
+
+@frappe.whitelist()
 def get_employee_shift_info(employee, work_date=None):
     from zkteco_attendance.zkteco_attendance.api.endpoints import get_employee_shift_info
     return get_employee_shift_info(employee, work_date)

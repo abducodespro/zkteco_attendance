@@ -143,6 +143,36 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
         show_checkin_dialog({ employee: emp, date, time, logtype, summary, checkin_name: checkin, is_overtime: ot, mode: "edit" });
     });
 
+    $body.on("click", ".zk-ignore-checkin", function (e) {
+        e.stopPropagation();
+        const $el = $(this);
+        const checkinName = $el.data("checkin-name");
+        if (!checkinName) return;
+        frappe.confirm(
+            __($el.data("ignored") ? "Unignore this checkin? It will be included in attendance processing again." : "Ignore this checkin? It will be excluded from attendance processing."),
+            () => {
+                frappe.call({
+                    method: "zkteco_attendance.zkteco_attendance.page.zk_daily_checkins.zk_daily_checkins.toggle_ignore_checkin",
+                    args: { checkin_name: checkinName },
+                    freeze: true,
+                    freeze_message: __($el.data("ignored") ? "Unignoring…" : "Ignoring…"),
+                    callback(r) {
+                        if (r.message) {
+                            frappe.show_alert({
+                                message: r.message.action === "ignored"
+                                    ? __("Checkin ignored successfully.")
+                                    : __("Checkin unignored successfully."),
+                                indicator: r.message.action === "ignored" ? "orange" : "green",
+                            }, 4);
+                            trigger_load();
+                        }
+                    },
+                });
+            },
+            () => {}
+        );
+    });
+
     // ── Load / Clear buttons ──────────────────────────────────────────────
     $filterWrap.find("#zk-load-btn").on("click", () => trigger_load());
     $filterWrap.find("#zk-clear-btn").on("click", () => {
@@ -218,14 +248,19 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
                 ? "zk-chip-ot"
                 : (c.log_type === "IN" ? "zk-chip-in" : "zk-chip-out");
             const label = c.is_overtime ? `${c.log_type} (OT)` : c.log_type;
+            const ignoredClass = c.ignored ? "zk-chip-ignored" : "";
 
             let manualBadge = "";
             let editBtn     = "";
+            let ignoreBtn   = "";
             if (c.manually_edited) {
                 const tip = c.edited_by
                     ? `${__("Edited by")} ${frappe.utils.escape_html(c.edited_by)}${c.edited_at ? " @ " + c.edited_at.substring(0,16) : ""}`
                     : __("Manually added/edited");
                 manualBadge = `<span class="zk-manual-badge" title="${tip}">✎</span>`;
+            }
+            if (c.ignored) {
+                manualBadge = `<span class="zk-ignored-badge" title="${__("This checkin is ignored — excluded from attendance processing")}">⊘</span>`;
             }
             if (state.can_edit_checkins) {
                 editBtn = `<span class="zk-edit-checkin" title="${__("Edit")}"
@@ -238,8 +273,12 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
                                 data-is-overtime="${c.is_overtime ? 1 : 0}"
                                 data-summary="${summary_attr}"
                                 style="cursor:pointer;margin-left:4px;opacity:0.6;">✎</span>`;
+                ignoreBtn = `<span class="zk-ignore-checkin" title="${c.ignored ? __("Unignore (include in attendance)") : __("Ignore (exclude from attendance)")}"
+                                data-checkin-name="${frappe.utils.escape_html(c.name || "")}"
+                                data-ignored="${c.ignored ? 1 : 0}"
+                                style="cursor:pointer;margin-left:4px;opacity:0.6;">${c.ignored ? "⊘" : "○"}</span>`;
             }
-            return `<span class="zk-chip ${otClass}">${c.time} <b>${label}</b>${manualBadge} ${editBtn}</span>`;
+            return `<span class="zk-chip ${otClass} ${ignoredClass}">${c.time} <b>${label}</b>${manualBadge} ${editBtn} ${ignoreBtn}</span>`;
         }).join(" ");
 
         if (!state.can_edit_checkins) {
