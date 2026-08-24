@@ -1149,6 +1149,11 @@ def get_daily_checkins_data(attendance_summary=None, from_date=None, to_date=Non
             doc_method=doc_method,
             doc_missing_action=doc_missing,
         )
+
+        # Resolve the employee's shift name for the card header
+        shift_doc = get_shift_for_employee(emp_id, from_date, default_shift)
+        shift_name = shift_doc.get("name") if shift_doc else ""
+
         employees.append({
             "employee":             emp_id,
             "employee_name":        emp_name,
@@ -1156,6 +1161,7 @@ def get_daily_checkins_data(attendance_summary=None, from_date=None, to_date=Non
             "designation":          desig,
             "zk_biometric_device":  zk_device,
             "attendance_device_id": att_dev_id,
+            "shift_type":           shift_name,
             "days":                 days,
         })
 

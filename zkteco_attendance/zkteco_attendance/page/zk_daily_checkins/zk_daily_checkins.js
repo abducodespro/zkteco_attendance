@@ -342,10 +342,10 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
                         : ""}
                 </div>
                 <div class="text-muted" style="font-size:0.72rem;margin-top:4px;">
-                    ${__("Abbreviations and Buttons")}: <span class="zk-ot-chip zk-ot-day">D ${__("Day")}</span>
-                    <span class="zk-ot-chip zk-ot-night">N: ${__("Night")}</span>
-                    <span class="zk-ot-chip zk-ot-weekend">W: ${__("Weekend")}</span>
-                    <span class="zk-ot-chip zk-ot-holiday">H: ${__("Holiday")}</span>
+                    ${__("Abbreviations and Buttons")}: <span class="zk-ot-chip zk-ot-day">D: ${__("Day OT")}</span>
+                    <span class="zk-ot-chip zk-ot-night">N: ${__("Night OT")}</span>
+                    <span class="zk-ot-chip zk-ot-weekend">W: ${__("Weekend OT")}</span>
+                    <span class="zk-ot-chip zk-ot-holiday">H: ${__("Holiday OT")}</span>
                     <span class="zk-ot-chip zk-ot-late">L-EN: ${__("Late Entry")}</span>
                     <span class="zk-ot-chip zk-ot-early">E-EX: ${__("Early Exit")}</span>
                     <span class="zk-ot-chip zk-ot-night">○: ${__("Ignore Button")}</span>
@@ -368,24 +368,27 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
 
             const deviceInfo = [];
             if (emp.zk_biometric_device) {
-                deviceInfo.push(`<span class="text-muted" title="${__("Biometric Device")}" style="margin-left:8px;font-size:0.78rem;">📱 ${frappe.utils.escape_html(emp.zk_biometric_device)}</span>`);
+                deviceInfo.push(`<span class="text-muted" title="${__("Biometric Device")}" style="margin-left:8px;font-size:0.78rem;"><b>Device</b> ${frappe.utils.escape_html(emp.zk_biometric_device)}</span>`);
             }
             if (emp.attendance_device_id) {
-                deviceInfo.push(`<span class="text-muted" title="${__("Device ID")}" style="margin-left:8px;font-size:0.78rem;">🆔 ${frappe.utils.escape_html(emp.attendance_device_id)}</span>`);
+                deviceInfo.push(`<span class="text-muted" title="${__("Device ID")}" style="margin-left:8px;font-size:0.78rem;"><b>Device ID</b> ${frappe.utils.escape_html(emp.attendance_device_id)}</span>`);
+            }
+            if (emp.shift_type) {
+                deviceInfo.push(`<span class="text-muted" title="${__("Shift Type")}" style="margin-left:8px;font-size:0.78rem;"><b>Shift</b> ${frappe.utils.escape_html(emp.shift_type)}</span>`);
             }
 
             return `
-                <div class="zk-emp-card" data-employee="${frappe.utils.escape_html(emp.employee)}" style="margin-bottom:10px;">
+                <div class="zk-emp-card" data-employee="${frappe.utils.escape_html(emp.employee)}" style="margin-bottom:6px; border: 1px solid #a19999">
                     <div class="zk-emp-card-head" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border:1px solid var(--border-color);border-radius:var(--border-radius);background:var(--card-bg);">
                         <div>
                             <b>${frappe.utils.escape_html(emp.employee_name||emp.employee)}</b>
-                            <span class="text-muted" style="margin-left:8px;">${frappe.utils.escape_html(emp.employee)}</span>
-                            ${emp.department ? `<span class="text-muted" style="margin-left:8px;">· ${frappe.utils.escape_html(emp.department)}</span>` : ""}
+                            <span class="text-muted" style="margin-left:8px;"><b>Employee ID</b> ${frappe.utils.escape_html(emp.employee)}</span>
+                            ${emp.department ? `<span class="text-muted" style="margin-left:8px;"><b>Department</b> ${frappe.utils.escape_html(emp.department)}</span>` : ""}
                             ${deviceInfo.join("")}
                         </div>
                         <div class="text-muted">${otLabel}<i class="fa fa-chevron-${isOpen?"up":"down"}"></i></div>
                     </div>
-                    <div class="zk-emp-card-body" style="display:${isOpen?"block":"none"};padding-top:8px;">
+                    <div class="zk-emp-card-body" style="display:${isOpen?"block":"none"};padding-top:4px;">
                         ${render_employee_table(emp, data.attendance_summary)}
                     </div>
                 </div>`;
@@ -545,14 +548,17 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
 
         const d = new frappe.ui.Dialog({
             title: mode === "edit" ? __("Edit Check-in") : __("Add Check-in"),
+            size: "large",
             fields: [
                 { fieldtype: "HTML", fieldname: "shift_info" },
+                { fieldtype: "Section Break", fieldname: "section_break_1" },
                 { fieldtype: "Link", fieldname: "employee", label: __("Employee"),
                   options: "Employee", default: employee, read_only: 1 },
                 { fieldtype: "Date", fieldname: "checkin_date", label: __("Date"),
                   default: date, reqd: 1 },
                 { fieldtype: "Time", fieldname: "checkin_time", label: __("Time"),
                   default: defaultTime, reqd: 1 },
+                { fieldtype: "Column Break", fieldname: "column_break_1" },
                 { fieldtype: "Select", fieldname: "log_type", label: __("Log Type"),
                   options: "IN\nOUT", default: logtype || "IN", reqd: 1 },
                 { fieldtype: "Check", fieldname: "is_overtime", label: __("Is Overtime"),
