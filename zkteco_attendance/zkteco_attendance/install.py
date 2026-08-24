@@ -10,13 +10,13 @@ def after_install():
     """Run after app is installed via bench install-app."""
     _create_biometric_device_manager_role()
     _create_checkin_editor_role()
-    _add_employee_biometric_field()
-    _add_employee_location_device_field()
     _add_employee_checkin_device_field()
     _add_employee_checkin_zk_uid_field()
     _add_employee_checkin_overtime_field()
     _add_employee_checkin_manual_fields()
     _add_employee_checkin_ignored_field()
+    _add_employee_biometric_field()
+    _add_employee_location_device_field()
     frappe.db.commit()
     frappe.msgprint(_("ZKTeco Attendance installed successfully."))
 
