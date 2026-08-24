@@ -80,6 +80,8 @@
             "delete": 1,
             "read": 1,
             "write": 1,
+            "import": 1,
+            "export": 1,
             "role": "System Manager"
         },
         {
@@ -87,6 +89,8 @@
             "delete": 0,
             "read": 1,
             "write": 1,
+            "import": 1,
+            "export": 1,
             "role": "HR Manager"
         },
         {
@@ -94,10 +98,13 @@
             "delete": 0,
             "read": 1,
             "write": 1,
+            "import": 1,
+            "export": 1,
             "role": "Biometric Device Manager"
         }
     ],
     "sort_field": "from_date",
+    "allow_import": 1,
     "sort_order": "DESC",
     "track_changes": 1
 }
