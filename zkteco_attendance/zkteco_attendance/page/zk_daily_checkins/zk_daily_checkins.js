@@ -300,7 +300,7 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
                 <tr>
                     <td style="border: 1px solid #385068;">${frappe.datetime.str_to_user(d.date)}${dayMark}</td>
                     <td style="border: 1px solid #385068;">${__(d.weekday)}</td>
-                    <td style="border: 1px solid #385068;"><span class="indicator-pill ${status_color(d.status)}">${__(d.status)}</span>${grace_badges(d)}</td>
+                    <td style="border: 1px solid #385068;"><span class="indicator-pill ${status_color(d.status)}">${__(d.status)}</span><br>${grace_badges(d)}</td>
                     <td class="text-right" style="border: 1px solid #385068;">${(d.hours||0).toFixed(2)}</td>
                     <td class="text-right ${d.overtime_hours ? 'text-warning' : ''}" style="border: 1px solid #385068;">${ot_cell(d)}</td>
                     <td style="border: 1px solid #385068;">${render_checkin_chips(d.checkins, emp.employee, d.date, summary_name)}</td>
