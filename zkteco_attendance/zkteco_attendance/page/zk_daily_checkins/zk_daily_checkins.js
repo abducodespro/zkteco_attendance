@@ -368,23 +368,23 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
 
             const deviceInfo = [];
             if (emp.zk_biometric_device) {
-                deviceInfo.push(`<span class="text-muted" title="${__("Biometric Device")}" style="margin-left:8px;font-size:0.78rem;"><b>Device</b> ${frappe.utils.escape_html(emp.zk_biometric_device)}</span>`);
+                deviceInfo.push(`<span class="text-muted" title="${__("Biometric Device")}" style="margin-left:8px;font-size:0.78rem;"><b>Device:</b> ${frappe.utils.escape_html(emp.zk_biometric_device)}</span>`);
             }
             if (emp.attendance_device_id) {
-                deviceInfo.push(`<span class="text-muted" title="${__("Device ID")}" style="margin-left:8px;font-size:0.78rem;"><b>Device ID</b> ${frappe.utils.escape_html(emp.attendance_device_id)}</span>`);
+                deviceInfo.push(`<span class="text-muted" title="${__("Device ID")}" style="margin-left:8px;font-size:0.78rem;"><b>Device Emp ID:</b> ${frappe.utils.escape_html(emp.attendance_device_id)}</span>`);
             }
             if (emp.shift_type) {
-                deviceInfo.push(`<span class="text-muted" title="${__("Shift Type")}" style="margin-left:8px;font-size:0.78rem;"><b>Shift</b> ${frappe.utils.escape_html(emp.shift_type)}</span>`);
+                deviceInfo.push(`<span class="text-muted" title="${__("Shift Type")}" style="margin-left:8px;font-size:0.78rem;"><b>Shift:</b> ${frappe.utils.escape_html(emp.shift_type)}</span>`);
             }
 
             return `
                 <div class="zk-emp-card" data-employee="${frappe.utils.escape_html(emp.employee)}" style="margin-bottom:6px; border: 1px solid #a19999">
                     <div class="zk-emp-card-head" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border:1px solid var(--border-color);border-radius:var(--border-radius);background:var(--card-bg);">
                         <div>
-                            <b>${frappe.utils.escape_html(emp.employee_name||emp.employee)}</b>
-                            <span class="text-muted" style="margin-left:8px;"><b>Employee ID</b> ${frappe.utils.escape_html(emp.employee)}</span>
-                            ${emp.department ? `<span class="text-muted" style="margin-left:8px;"><b>Department</b> ${frappe.utils.escape_html(emp.department)}</span>` : ""}
-                            ${deviceInfo.join("")}
+                            <span class="text-muted" style="margin-left:8px; border:1px solid #e4e3e3; border-radius:var(--border-radius); padding:2px 4px;"><b>Emp Name:</b> ${frappe.utils.escape_html(emp.employee_name||emp.employee)}</span>
+                            <span class="text-muted" style="margin-left:8px; border:1px solid #e4e3e3; border-radius:var(--border-radius); padding:2px 4px;"><b>Emp ID:</b> ${frappe.utils.escape_html(emp.employee)}</span>
+                            ${emp.department ? `<span class="text-muted" style="margin-left:8px; border:1px solid #e4e3e3; border-radius:var(--border-radius); padding:2px 4px;"><b>Department:</b> ${frappe.utils.escape_html(emp.department)}</span>` : ""}
+                            <span class="text-muted" style="margin-left:8px; border:1px solid #e4e3e3; border-radius:var(--border-radius); padding:2px 4px;">${deviceInfo.join("")}</span>
                         </div>
                         <div class="text-muted">${otLabel}<i class="fa fa-chevron-${isOpen?"up":"down"}"></i></div>
                     </div>
