@@ -253,9 +253,9 @@ def sync_device(device_name, triggered_by="Manual", user=None):
     device = frappe.get_doc("Biometric Device", device_name)
     user = user or frappe.session.user
 
-    if device.status != "Active":
-        _emit_progress(device_name, user, "error", message=_("Device is not Active"))
-        return {"success": False, "error": "Device is not Active"}
+    if not device.enable:
+        _emit_progress(device_name, user, "error", message=_("Device is not enabled"))
+        return {"success": False, "error": "Device is not enabled"}
 
     sync_start = now_datetime()
     total_records    = 0
@@ -390,7 +390,7 @@ def sync_device(device_name, triggered_by="Manual", user=None):
 
 
 def sync_all_active_devices(frequency_filter=None, triggered_by="Scheduler"):
-    filters = {"status": "Active", "auto_sync_enabled": 1}
+    filters = {"enable": 1, "auto_sync_enabled": 1}
     if frequency_filter:
         filters["sync_frequency"] = frequency_filter
     devices = frappe.get_all("Biometric Device", filters=filters, fields=["name"])

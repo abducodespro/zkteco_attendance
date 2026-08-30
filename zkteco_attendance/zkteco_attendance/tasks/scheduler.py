@@ -30,7 +30,7 @@ def sync_devices_on_schedule():
     try:
         devices = frappe.get_all(
             "Biometric Device",
-            filters={"status": "Active", "auto_sync_enabled": 1},
+            filters={"enable": 1, "auto_sync_enabled": 1},
             fields=["name", "sync_frequency", "last_sync_time"],
         )
 

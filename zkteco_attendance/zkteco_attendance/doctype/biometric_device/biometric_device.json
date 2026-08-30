@@ -15,6 +15,7 @@
   "company",
   "location",
   "status",
+    "enable",
   "last_sync_time",
   "section_auth",
   "time_zone",
@@ -84,6 +85,13 @@
    "in_list_view": 1,
    "label": "Status",
    "options": "Active\nInactive"
+  },
+  {
+   "default":  1,
+   "fieldname": "enable",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Enabled"
   },
   {
    "fieldname": "last_sync_time",

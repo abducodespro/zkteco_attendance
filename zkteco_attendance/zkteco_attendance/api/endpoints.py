@@ -31,8 +31,8 @@ def pull_checkins_now(device_name):
     frappe.only_for(["System Manager", "HR Manager", "Biometric Device Manager"])
 
     device = frappe.get_doc("Biometric Device", device_name)
-    if device.status != "Active":
-        frappe.throw(_("Device {0} is not Active. Please activate it first.").format(device_name))
+    if not device.enable:
+        frappe.throw(_("Device {0} is not enabled. Please enable it first.").format(device_name))
 
     from zkteco_attendance.zkteco_attendance.sync_engine import sync_device
 
@@ -52,8 +52,8 @@ def sync_device(device_name):
     frappe.only_for(["System Manager", "HR Manager", "Biometric Device Manager"])
 
     device = frappe.get_doc("Biometric Device", device_name)
-    if device.status != "Active":
-        frappe.throw(_("Device {0} is not Active. Please activate it first.").format(device_name))
+    if not device.enable:
+        frappe.throw(_("Device {0} is not enabled. Please enable it first.").format(device_name))
 
     frappe.enqueue(
         "zkteco_attendance.zkteco_attendance.sync_engine.sync_device",
@@ -256,7 +256,7 @@ def get_dashboard_data():
     frappe.only_for(["System Manager", "HR Manager", "Biometric Device Manager"])
 
     total_devices = frappe.db.count("Biometric Device")
-    online_devices = frappe.db.count("Biometric Device", {"status": "Active"})
+    online_devices = frappe.db.count("Biometric Device", {"enable": 1})
     offline_devices = total_devices - online_devices
 
     today = nowdate()

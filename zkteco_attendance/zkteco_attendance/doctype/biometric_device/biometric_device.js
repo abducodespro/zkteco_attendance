@@ -76,11 +76,11 @@ frappe.ui.form.on("Biometric Device", {
     },
 
     pull_checkins_with_progress(frm) {
-        if (frm.doc.status !== "Active") {
+        if (!frm.doc.enable) {
             frappe.msgprint({
-                title: __("Device Not Active"),
+                title: __("Device Not Enabled"),
                 indicator: "red",
-                message: __("This device is not Active. Please run Test Connection first."),
+                message: __("This device is not enabled. Please enable it first."),
             });
             return;
         }
