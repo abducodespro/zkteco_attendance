@@ -79,16 +79,23 @@ def get_employee_by_biometric_id(user_id, company=None, device_name=None):
 # Duplicate check against DB
 # ─────────────────────────────────────────────────────────────────────────────
 
-def checkin_exists(employee, timestamp, log_type, device_name):
-    """Return True if a matching checkin exists within ±60s."""
+def checkin_exists(employee, timestamp, device_name):
+    """Return True if a matching checkin exists within ±60s.
+
+    We intentionally omit the log_type filter because ERPNext's
+    Employee Checkin validation rejects duplicates based on (employee, time)
+    only — not on log_type.  Filtering by log_type here caused false
+    negatives when the IN/OUT alternation between pulls didn't match,
+    leading to 'already has a log with the same timestamp' errors.
+    """
     ts = get_datetime(timestamp)
     ts_from = ts - timedelta(seconds=60)
     ts_to   = ts + timedelta(seconds=60)
     result = frappe.db.sql(
         """SELECT name FROM `tabEmployee Checkin`
-           WHERE employee=%s AND log_type=%s AND `time` BETWEEN %s AND %s
+           WHERE employee=%s AND `time` BETWEEN %s AND %s
              AND device_id=%s LIMIT 1""",
-        (employee, log_type, ts_from, ts_to, device_name)
+        (employee, ts_from, ts_to, device_name)
     )
     return bool(result)
 
@@ -335,7 +342,7 @@ def sync_device(device_name, triggered_by="Manual", user=None):
                 errors.append("No employee for biometric ID: {}".format(user_id))
                 continue
 
-            if checkin_exists(emp["name"], timestamp, log_type, device_name):
+            if checkin_exists(emp["name"], timestamp, device_name):
                 duplicates += 1
                 continue
 
@@ -346,11 +353,19 @@ def sync_device(device_name, triggered_by="Manual", user=None):
                 overtime_records += 1
 
         except Exception as e:
+            err_msg = str(e)
+            # ERPNext raises DuplicateEntryError when an Employee Checkin
+            # with the same employee + timestamp already exists.  Treat
+            # these as duplicates rather than failures.
+            if "already has a log with the same timestamp" in err_msg or \
+               "DuplicateEntryError" in type(e).__name__:
+                duplicates += 1
+                continue
             failed += 1
-            errors.append("uid={}: {}".format(rec.get("uid"), str(e)))
+            errors.append("uid={}: {}".format(rec.get("uid"), err_msg))
             frappe.log_error(
                 message="Failed checkin for device {}, uid {}: {}".format(
-                    device_name, rec.get("uid"), str(e)),
+                    device_name, rec.get("uid"), err_msg),
                 title="ZKTeco Checkin Error"
             )
 
