@@ -100,18 +100,6 @@ def checkin_exists(employee, timestamp, device_name):
     return bool(result)
 
 
-def raw_record_already_pulled(device_name, uid):
-    """Return True if a raw device record uid has already been created."""
-    if uid is None:
-        return False
-    result = frappe.db.sql(
-        """SELECT name FROM `tabEmployee Checkin`
-           WHERE device_id=%s AND zk_uid=%s LIMIT 1""",
-        (device_name, str(uid))
-    )
-    return bool(result)
-
-
 # ─────────────────────────────────────────────────────────────────────────────
 # Double-punch detection (same employee, within 1 minute of previous punch)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -210,7 +198,7 @@ def group_records_by_attendance_date(records, device):
     their own calendar day.
 
     Returns (grouped, emp_cache) where grouped is {(user_id, date): [rec,...]}
-    and emp_cache maps user_id -> matched Employee dict (reused by Step 5 to
+    and emp_cache maps user_id -> matched Employee dict (reused by Step 4 to
     avoid re-querying).
     """
     emp_cache = {}
@@ -292,15 +280,17 @@ def sync_device(device_name, triggered_by="Manual", user=None):
         frappe.db.commit()
         return {"success": False, "error": str(e)}
 
-    # ── Step 2: Filter already-pulled (New Records Only) ───────────────────
-    if device.fetch_mode == "New Records Only":
-        before = len(records)
-        records = [r for r in records if not raw_record_already_pulled(device_name, r.get("uid"))]
-        _emit_progress(device_name, user, "filtered", len(records), before,
-                       _("Skipping {0} already-pulled; {1} new to process.")
-                       .format(before - len(records), len(records)))
+    # Note: we deliberately do NOT pre-filter "already pulled" records by
+    # their device `uid`.  On ZKTeco devices (and in pyzk), an attendance
+    # log's `uid` is the user's device-internal id and is REUSED by every
+    # punch of that user — it is not a unique per-log id.  Filtering on it
+    # made "New Records Only" skip every new punch of any employee who
+    # already had one check-in (they were all flagged "already pulled").
+    # Duplicate prevention is instead handled per-record in the create
+    # step below via checkin_exists (employee + time ±60s + device), which
+    # works regardless of fetch mode.
 
-    # ── Step 3: Filter double punches (within 60s per employee) ───────────
+    # ── Step 2: Filter double punches (within 60s per employee) ───────────
     records, double_punches = filter_double_punches(records)
     if double_punches:
         _emit_progress(device_name, user, "deduped", len(records), total_records,
@@ -308,7 +298,7 @@ def sync_device(device_name, triggered_by="Manual", user=None):
                        .format(double_punches),
                        extra={"double_punches": double_punches})
 
-    # ── Step 4: Resolve IN/OUT log types per employee/day ─────────────────
+    # ── Step 3: Resolve IN/OUT log types per employee/day ─────────────────
     enable_ot = cint(getattr(device, "enable_overtime_punches", 1))
 
     # Group by attendance date (night-shift aware) so an IN on 01/01 17:03
@@ -326,7 +316,7 @@ def sync_device(device_name, triggered_by="Manual", user=None):
         for rec, lt in zip(day_recs_sorted, log_types):
             resolved_log_type[id(rec)] = lt
 
-    # ── Step 5: Create Employee Checkins ──────────────────────────────────
+    # ── Step 4: Create Employee Checkins ──────────────────────────────────
     total_to_process = len(records)
     for idx, rec in enumerate(records, start=1):
         try:

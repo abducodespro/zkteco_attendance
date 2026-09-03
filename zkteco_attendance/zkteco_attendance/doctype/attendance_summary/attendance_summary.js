@@ -80,6 +80,20 @@ frappe.ui.form.on("Attendance Summary", {
         }
     },
 
+    from_date(frm) {
+        if (frm.doc.from_date) {
+            let d = frappe.datetime.str_to_obj(frm.doc.from_date);
+            frm.set_value("year", d.getFullYear());
+            frm.set_value("month", [
+                "January","February","March","April","May","June",
+                "July","August","September","October","November","December"
+            ][d.getMonth()]);
+
+            let last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+            frm.set_value("to_date", frappe.datetime.obj_to_str(last));
+        }
+    },
+
     set_status_indicator(frm) {
         const colors = { "Draft": "gray", "Processing": "orange", "Completed": "green" };
         frm.page.set_indicator(frm.doc.status, colors[frm.doc.status] || "gray");

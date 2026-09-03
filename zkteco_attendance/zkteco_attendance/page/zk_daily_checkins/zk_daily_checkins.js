@@ -378,10 +378,10 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
             }
 
             return `
-                <div class="zk-emp-card" data-employee="${frappe.utils.escape_html(emp.employee)}" style="margin-bottom:6px; border: 1px solid #a19999">
+                <div class="zk-emp-card" data-employee="${frappe.utils.escape_html(emp.employee)}" style="margin-bottom:4px; border: 1px solid #a19999">
                     <div class="zk-emp-card-head" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border:1px solid var(--border-color);border-radius:var(--border-radius);background:var(--card-bg);">
                         <div>
-                            <span class="text-muted" style="margin-left:8px; border:1px solid #e4e3e3; border-radius:var(--border-radius); padding:2px 4px;"><b>Emp Name:</b> ${frappe.utils.escape_html(emp.employee_name||emp.employee)}</span>
+                            <span class="text-muted" style="margin-left:8px; border:1px solid #e4e3e3; border-radius:var(--border-radius); padding:2px 4px;"><b>Emp Name:</b> ${frappe.utils.escape_html(emp.fullname || emp.employee_name || emp.employee)}</span>
                             <span class="text-muted" style="margin-left:8px; border:1px solid #e4e3e3; border-radius:var(--border-radius); padding:2px 4px;"><b>Emp ID:</b> ${frappe.utils.escape_html(emp.employee)}</span>
                             ${emp.department ? `<span class="text-muted" style="margin-left:8px; border:1px solid #e4e3e3; border-radius:var(--border-radius); padding:2px 4px;"><b>Department:</b> ${frappe.utils.escape_html(emp.department)}</span>` : ""}
                             <span class="text-muted" style="margin-left:8px; border:1px solid #e4e3e3; border-radius:var(--border-radius); padding:2px 4px;">${deviceInfo.join("")}</span>

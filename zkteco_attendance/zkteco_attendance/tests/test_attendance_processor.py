@@ -906,5 +906,152 @@ class TestHolidayAsPresent(unittest.TestCase):
         self.assertAlmostEqual(result["absent_hours"], 0.0, places=2)
 
 
+class TestDailyCheckinsBiometricDeviceFilter(unittest.TestCase):
+    """
+    The Biometric Device dropdown on the Daily Checkins page must actually
+    narrow the employee list (and therefore the check-in rows shown), whether
+    the page was opened from an Attendance Summary or standalone.
+    Previously the filter was ignored in summary mode, so all summary
+    employees (and their rows) were shown regardless of the selected device.
+    """
+
+    def _make_summary_doc(self, rows):
+        """Fake Attendance Summary doc whose details mimic child-table rows."""
+        from types import SimpleNamespace
+
+        details = []
+        for emp, device, att_id in rows:
+            details.append(SimpleNamespace(
+                employee=emp,
+                employee_name=emp.replace("-", " "),
+                department="Dept",
+                designation="",
+                zk_biometric_device=device,
+                attendance_device_id=att_id,
+            ))
+        return SimpleNamespace(
+            name="SUM-0001",
+            from_date=date(2026, 8, 1),
+            to_date=date(2026, 8, 31),
+            company="Acme",
+            details=details,
+            working_hours_method="First IN - Last OUT",
+            missing_checkin_action="Mark as Invalid",
+            shift_type=None,
+        )
+
+    @patch("zkteco_attendance.zkteco_attendance.attendance_processor.get_shift_for_employee")
+    @patch("zkteco_attendance.zkteco_attendance.attendance_processor.get_employee_daily_breakdown")
+    @patch("zkteco_attendance.zkteco_attendance.attendance_processor.fetch_checkins")
+    @patch("frappe.get_all")
+    @patch("frappe.get_doc")
+    def test_summary_mode_filters_employees_by_device(
+            self, mock_get_doc, mock_get_all, mock_fetch, mock_breakdown, mock_shift):
+        """From an Attendance Summary, only employees on the selected device remain."""
+        from zkteco_attendance.zkteco_attendance.attendance_processor import get_daily_checkins_data
+
+        mock_get_doc.return_value = self._make_summary_doc([
+            ("EMP-A", "DEV-A", "101"),
+            ("EMP-B", "DEV-B", "202"),   # different device -> must be filtered out
+            ("EMP-C", "DEV-A", "103"),
+        ])
+        mock_fetch.return_value = {}  # no check-ins needed for the filter assertions
+        mock_breakdown.return_value = []
+        mock_shift.return_value = None
+        mock_get_all.return_value = [
+            {"name": "EMP-A", "employee_name": "EMP A", "department": "Dept",
+             "designation": "", "zk_biometric_device": "DEV-A",
+             "attendance_device_id": "101"},
+            {"name": "EMP-C", "employee_name": "EMP C", "department": "Dept",
+             "designation": "", "zk_biometric_device": "DEV-A",
+             "attendance_device_id": "103"},
+        ]
+
+        result = get_daily_checkins_data(
+            attendance_summary="SUM-0001",
+            from_date="2026-08-01",
+            to_date="2026-08-31",
+            biometric_device="DEV-A",
+        )
+
+        emp_ids = [e["employee"] for e in result["employees"]]
+        self.assertEqual(emp_ids, ["EMP-A", "EMP-C"])
+        # Check-in rows are only fetched for the filtered employees
+        mock_fetch.assert_called_once()
+        fetched_list = mock_fetch.call_args[0][0]
+        self.assertEqual(fetched_list, ["EMP-A", "EMP-C"])
+        # Page header name field: `fullname` must be populated for every employee
+        by_emp = {e["employee"]: e for e in result["employees"]}
+        self.assertEqual(by_emp["EMP-A"]["fullname"], "EMP A")
+        self.assertEqual(by_emp["EMP-C"]["fullname"], "EMP C")
+
+    @patch("zkteco_attendance.zkteco_attendance.attendance_processor.get_shift_for_employee")
+    @patch("zkteco_attendance.zkteco_attendance.attendance_processor.get_employee_daily_breakdown")
+    @patch("zkteco_attendance.zkteco_attendance.attendance_processor.fetch_checkins")
+    @patch("frappe.get_all")
+    def test_standalone_explicit_list_filters_employees_by_device(
+            self, mock_get_all, mock_fetch, mock_breakdown, mock_shift):
+        """Standalone with an explicit employee list: device filter intersects the list."""
+        from zkteco_attendance.zkteco_attendance.attendance_processor import get_daily_checkins_data
+
+        # Employee master: EMP-A is on DEV-A, EMP-B is on DEV-B
+        def fake_get_all(doctype, filters=None, fields=None, **kwargs):
+            if doctype != "Employee":
+                return []
+            names = filters["name"][1]
+            device = filters["zk_biometric_device"]
+            by_name = {"EMP-A": "DEV-A", "EMP-B": "DEV-B"}
+            selected = [n for n in names if by_name.get(n) == device]
+            if fields == ["name"]:
+                return [{"name": n} for n in selected]
+            return [{"name": n, "employee_name": n.replace("-", " "),
+                     "department": "Dept", "designation": "",
+                     "zk_biometric_device": by_name[n],
+                     "attendance_device_id": "1"} for n in selected]
+
+        mock_get_all.side_effect = fake_get_all
+        mock_fetch.return_value = {}
+        mock_breakdown.return_value = []
+        mock_shift.return_value = None
+
+        result = get_daily_checkins_data(
+            attendance_summary=None,
+            from_date="2026-08-01",
+            to_date="2026-08-31",
+            employee_list=["EMP-A", "EMP-B"],
+            biometric_device="DEV-A",
+        )
+
+        emp_ids = [e["employee"] for e in result["employees"]]
+        self.assertEqual(emp_ids, ["EMP-A"])
+        self.assertEqual(result["employees"][0]["fullname"], "EMP A")
+
+    @patch("zkteco_attendance.zkteco_attendance.attendance_processor.get_shift_for_employee")
+    @patch("zkteco_attendance.zkteco_attendance.attendance_processor.get_employee_daily_breakdown")
+    @patch("zkteco_attendance.zkteco_attendance.attendance_processor.fetch_checkins")
+    @patch("frappe.get_all")
+    @patch("frappe.get_doc")
+    def test_summary_mode_no_match_returns_empty_payload(
+            self, mock_get_doc, mock_get_all, mock_fetch, mock_breakdown, mock_shift):
+        """No employee on the selected device -> empty employees, not an error."""
+        from zkteco_attendance.zkteco_attendance.attendance_processor import get_daily_checkins_data
+
+        mock_get_doc.return_value = self._make_summary_doc([("EMP-B", "DEV-B", "202")])
+        mock_fetch.return_value = {}
+        mock_breakdown.return_value = []
+        mock_shift.return_value = None
+        mock_get_all.return_value = []
+
+        result = get_daily_checkins_data(
+            attendance_summary="SUM-0001",
+            from_date="2026-08-01",
+            to_date="2026-08-31",
+            biometric_device="DEV-A",
+        )
+
+        self.assertEqual(result["employees"], [])
+        mock_fetch.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

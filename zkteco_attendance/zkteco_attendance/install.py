@@ -184,7 +184,7 @@ def _add_employee_checkin_device_field():
 
 
 def _add_employee_checkin_zk_uid_field():
-    """Add zk_uid field to Employee Checkin (raw device record id, used for de-duplication)."""
+    """Add zk_uid field to Employee Checkin (informational only)."""
     if _field_exists("Employee Checkin", "zk_uid"):
         return
 
@@ -198,7 +198,7 @@ def _add_employee_checkin_zk_uid_field():
         "fieldname": "zk_uid",
         "fieldtype": "Data",
         "insert_after": insert_after,
-        "description": "Raw attendance record ID (uid) from the biometric device.",
+        "description": "Device-internal user id (uid) of the punch. Informational only — not unique per attendance log, so it is NOT used for de-duplication.",
         "in_list_view": 0,
         "read_only": 1,
         "no_copy": 1,

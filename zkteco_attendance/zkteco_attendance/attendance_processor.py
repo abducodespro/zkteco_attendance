@@ -683,7 +683,7 @@ def calc_overtime_hours(day_checkins, shift, total_hours, day_type="working",
     if total_ot <= threshold_hours:
         return zero
 
-    remaining = total_ot - threshold_hours
+    remaining = total_ot
     scale = remaining / total_ot if total_ot > 0 else 0
     day_ot     *= scale
     night_ot   *= scale
@@ -1104,19 +1104,59 @@ def get_daily_checkins_data(attendance_summary=None, from_date=None, to_date=Non
                 "employees": [],
             }
 
+    # ── Biometric Device filter ─────────────────────────────────────────────
+    # The dropdown must actually narrow the results. Because Employee Checkins
+    # carry no device of their own, this filters the employee list — and with
+    # it each employee's check-in rows. Match against the same source the card
+    # headers display: the Attendance Summary detail row in summary mode, the
+    # Employee master otherwise. Explicit list order is preserved.
+    if biometric_device and employee_list:
+        if attendance_summary:
+            employee_list = [
+                row.employee for row in doc.details
+                if (getattr(row, "zk_biometric_device", None) or "") == biometric_device
+            ]
+        else:
+            device_rows = frappe.get_all(
+                "Employee",
+                filters={
+                    "name": ["in", employee_list],
+                    "zk_biometric_device": biometric_device,
+                },
+                fields=["name"],
+            )
+            device_emps = {r["name"] for r in device_rows}
+            employee_list = [e for e in employee_list if e in device_emps]
+
+        if not employee_list:
+            return {
+                "attendance_summary": attendance_summary or "",
+                "company": company or "",
+                "from_date": from_date or "",
+                "to_date": to_date or "",
+                "employees": [],
+            }
+
     checkins_by_employee = fetch_checkins(employee_list, from_date, to_date)
 
     # Resolve employee names for standalone mode
+    # `full_name` only exists on Employee in newer HRMS versions; fall back to
+    # employee_name otherwise so the Daily Checkins page header always gets
+    # the employee's display name under `fullname`.
+    has_full_name_col = bool(employee_list) and has_column("Employee", "full_name")
     emp_info = {}
     if employee_list:
         emp_filters = {"name": ["in", employee_list]}
         if biometric_device:
             emp_filters["zk_biometric_device"] = biometric_device
+        emp_fields = ["name", "employee_name", "department",
+                      "designation", "zk_biometric_device",
+                      "attendance_device_id"]
+        if has_full_name_col:
+            emp_fields.append("full_name")
         rows = frappe.get_all("Employee",
                               filters=emp_filters,
-                              fields=["name", "employee_name", "department",
-                                      "designation", "zk_biometric_device",
-                                      "attendance_device_id"])
+                              fields=emp_fields)
         emp_info = {r.name: r for r in rows}
 
     employees = []
@@ -1140,6 +1180,8 @@ def get_daily_checkins_data(attendance_summary=None, from_date=None, to_date=Non
             zk_device = info.get("zk_biometric_device") or ""
             att_dev_id = info.get("attendance_device_id") or ""
 
+        fullname = (info.get("full_name") or "").strip() or emp_name
+
         days = get_employee_daily_breakdown(
             employee=emp_id,
             from_date=from_date,
@@ -1157,6 +1199,7 @@ def get_daily_checkins_data(attendance_summary=None, from_date=None, to_date=Non
         employees.append({
             "employee":             emp_id,
             "employee_name":        emp_name,
+            "fullname":             fullname,
             "department":           dept,
             "designation":          desig,
             "zk_biometric_device":  zk_device,

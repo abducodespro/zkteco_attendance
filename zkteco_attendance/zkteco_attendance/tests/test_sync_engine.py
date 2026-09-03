@@ -63,8 +63,73 @@ class TestSyncEngine(unittest.TestCase):
         from zkteco_attendance.zkteco_attendance.sync_engine import checkin_exists
         # Without any actual checkin record this should return falsy
         ts = now_datetime()
-        result = checkin_exists("HR-EMP-00001", ts, "IN", "Test-ZK-Device")
+        result = checkin_exists("HR-EMP-00001", ts, "Test-ZK-Device")
         self.assertFalse(result)
+
+    @patch("zkteco_attendance.zkteco_attendance.sync_engine._save_sync_log")
+    @patch("zkteco_attendance.zkteco_attendance.sync_engine.create_employee_checkin")
+    @patch("zkteco_attendance.zkteco_attendance.sync_engine.checkin_exists")
+    @patch("zkteco_attendance.zkteco_attendance.sync_engine.get_shift_for_employee")
+    @patch("zkteco_attendance.zkteco_attendance.sync_engine.get_employee_by_biometric_id")
+    @patch("zkteco_attendance.zkteco_attendance.sync_engine.pull_attendance_from_device")
+    def test_new_records_only_pulls_new_punch_when_uid_already_synced(self, mock_pull, mock_emp, mock_shift, mock_exists, mock_create, mock_log):
+        """
+        Regression test: on real ZKTeco devices (and in pyzk) an attendance
+        log's `uid` is the user's device-internal id, REUSED by every punch
+        of that user — it is not a unique per-log id. The old "New Records
+        Only" pre-filter (raw_record_already_pulled by zk_uid) therefore
+        skipped every new punch of any employee who already had one
+        check-in, so new attendance stopped being pulled. Only the
+        employee + time (±60s) duplicate check may skip a record.
+        """
+        from zkteco_attendance.zkteco_attendance.sync_engine import sync_device
+
+        if not frappe.db.exists("Biometric Device", "Test-ZK-NewOnly"):
+            device = frappe.get_doc({
+                "doctype": "Biometric Device",
+                "device_name": "Test-ZK-NewOnly",
+                "device_ip": "192.168.1.101",
+                "port": 4370,
+                "company": frappe.defaults.get_global_default("company"),
+                "status": "Active",
+                "time_zone": "UTC",
+                "fetch_mode": "New Records Only",
+                "auto_sync_enabled": 1,
+                "sync_frequency": "5 Min",
+            })
+            device.insert(ignore_permissions=True)
+            frappe.db.commit()
+
+        t1 = get_datetime("2026-01-05 09:00:00")
+        t2 = get_datetime("2026-01-05 17:00:00")
+
+        # Two punches of the SAME employee on the SAME device share uid=7
+        # (device-internal user index), exactly like real device data.
+        mock_pull.return_value = [
+            {"uid": 7, "user_id": "100", "timestamp": t1, "punch": 0, "status": 0},
+            {"uid": 7, "user_id": "100", "timestamp": t2, "punch": 0, "status": 0},
+        ]
+        mock_emp.return_value = {"name": "HR-EMP-00001", "employee_name": "Test", "company": "Acme"}
+        mock_shift.return_value = {}
+
+        # t1 already exists in the DB (duplicate); t2 is a brand-new punch.
+        def fake_exists(employee, timestamp, device_name):
+            return timestamp == t1
+        mock_exists.side_effect = fake_exists
+        mock_create.return_value = "CHECKIN-1"
+
+        result = sync_device("Test-ZK-NewOnly", triggered_by="Test", user="Administrator")
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["new_records"], 1)
+        self.assertEqual(result["duplicates"], 1)
+        self.assertEqual(result["failed"], 0)
+
+        # The new punch (uid re-used from t1) must still be created.
+        mock_create.assert_called_once()
+        args, kwargs = mock_create.call_args
+        self.assertEqual(args[:3], ("HR-EMP-00001", "Test", t2))
+        self.assertEqual(kwargs.get("uid"), 7)
 
     def test_get_punch_type_mapping(self):
         """Punch codes should map correctly to IN/OUT."""

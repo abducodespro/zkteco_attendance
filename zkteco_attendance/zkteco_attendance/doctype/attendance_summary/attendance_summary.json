@@ -4,16 +4,19 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "company","column_break_1","from_date","to_date","status",
+  "from_date","to_date","month","year","column_break_1","company","project","status",
   "section_settings","shift_type","col_break_settings","working_hours_method","missing_checkin_action",
   "section_details","details",
   "section_summary","total_employees","total_working_days","column_break_summary","total_overtime_hours","total_day_ot_hours","total_night_ot_hours","total_weekend_ot_hours","total_holiday_ot_hours"
  ],
  "fields": [
-  {"fieldname":"company","fieldtype":"Link","label":"Company","options":"Company","reqd":1,"in_list_view":1},
-  {"fieldname":"column_break_1","fieldtype":"Column Break"},
   {"fieldname":"from_date","fieldtype":"Date","label":"From Date","reqd":1,"in_list_view":1},
   {"fieldname":"to_date","fieldtype":"Date","label":"To Date","reqd":1,"in_list_view":1},
+  {"fieldname":"month","fieldtype":"Data","label":"Month","read_only":1,"in_list_view":1},
+  {"fieldname":"year","fieldtype":"Data","label":"Year","read_only":1,"in_list_view":1},
+  {"fieldname":"column_break_1","fieldtype":"Column Break"},
+  {"fieldname":"company","fieldtype":"Link","label":"Company","options":"Company","reqd":1,"in_list_view":1},
+  {"fieldname":"project","fieldtype":"Link","label":"Project","options":"Project","reqd":1,"in_list_view":1},
   {"fieldname":"status","fieldtype":"Select","label":"Status","options":"Draft\nProcessing\nCompleted","default":"Draft","in_list_view":1,"read_only":1},
   {"fieldname":"section_settings","fieldtype":"Section Break","label":"Processing Settings"},
   {"fieldname":"shift_type","fieldtype":"Link","label":"Default Shift Type","options":"ZK Shift Type","description":"Fallback shift used when employee has no assignment"},
