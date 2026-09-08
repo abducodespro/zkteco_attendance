@@ -17,7 +17,21 @@ from .attendance_processor import get_shift_for_employee, _coerce_time
 # Realtime progress helper
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _emit_progress(device_name, user, stage, current=0, total=0, message="", extra=None):
+def _progress_cache_key(device_name, user):
+    return "zkteco_pull_progress:{}:{}".format(device_name, user or "system")
+
+
+def _get_cache():
+    """Return the shared Redis cache, compatible with v14 (frappe.cache()
+    callable) and v15+ (frappe.cache object)."""
+    cache = frappe.cache
+    if callable(cache):
+        cache = cache()
+    return cache
+
+
+def _emit_progress(device_name, user, stage, current=0, total=0, message="", extra=None,
+                   run_id=None):
     payload = {
         "device": device_name,
         "stage": stage,
@@ -25,12 +39,41 @@ def _emit_progress(device_name, user, stage, current=0, total=0, message="", ext
         "total": total,
         "message": message,
     }
+    if run_id:
+        payload["run_id"] = run_id
     if extra:
         payload.update(extra)
+    # Publish over realtime (fast path when websocket is available)
     try:
         frappe.publish_realtime(event="zkteco_pull_progress", message=payload, user=user)
     except Exception:
         pass
+    # Also cache the latest payload so the form can poll for progress when
+    # realtime/websocket delivery is unavailable (e.g. behind a proxy that
+    # doesn't forward websockets). Keyed per device+user with a TTL.
+    try:
+        _get_cache().set_value(_progress_cache_key(device_name, user), payload,
+                               expires_in_sec=600)
+    except Exception:
+        pass
+
+
+def get_live_progress(device_name, user=None, run_id=None):
+    """
+    Return the most recent cached progress payload for a device+user pull.
+    When run_id is given, only a payload belonging to that exact pull run is
+    returned (stale payloads from previous pulls are ignored).
+    """
+    try:
+        payload = _get_cache().get_value(
+            _progress_cache_key(device_name, user or frappe.session.user))
+    except Exception:
+        return None
+    if not payload:
+        return None
+    if run_id and payload.get("run_id") != run_id:
+        return None
+    return payload
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -244,12 +287,12 @@ def get_attendance_date_for_punch(user_id, timestamp, device, emp_cache, shift_c
     return timestamp.date()
 
 
-def sync_device(device_name, triggered_by="Manual", user=None):
+def sync_device(device_name, triggered_by="Manual", user=None, run_id=None):
     device = frappe.get_doc("Biometric Device", device_name)
     user = user or frappe.session.user
 
     if not device.enable:
-        _emit_progress(device_name, user, "error", message=_("Device is not enabled"))
+        _emit_progress(device_name, user, "error", message=_("Device is not enabled"), run_id=run_id)
         return {"success": False, "error": "Device is not enabled"}
 
     sync_start = now_datetime()
@@ -262,7 +305,7 @@ def sync_device(device_name, triggered_by="Manual", user=None):
     errors           = []
 
     def _progress_cb(stage, current, total, message):
-        _emit_progress(device_name, user, stage, current, total, message)
+        _emit_progress(device_name, user, stage, current, total, message, run_id=run_id)
 
     # ── Step 1: Pull raw records ───────────────────────────────────────────
     try:
@@ -272,7 +315,7 @@ def sync_device(device_name, triggered_by="Manual", user=None):
         )
         total_records = len(records)
     except Exception as e:
-        _emit_progress(device_name, user, "failed", message=str(e))
+        _emit_progress(device_name, user, "failed", message=str(e), run_id=run_id)
         _save_sync_log(device=device_name, start_time=sync_start, end_time=now_datetime(),
                        total=0, created=0, dupes=0, failed=0, overtime=0, double_punches=0,
                        status="Failed", error=str(e), triggered_by=triggered_by)
@@ -296,7 +339,7 @@ def sync_device(device_name, triggered_by="Manual", user=None):
         _emit_progress(device_name, user, "deduped", len(records), total_records,
                        _("Removed {0} double punch(es) (same employee within 1 minute).")
                        .format(double_punches),
-                       extra={"double_punches": double_punches})
+                       extra={"double_punches": double_punches}, run_id=run_id)
 
     # ── Step 3: Resolve IN/OUT log types per employee/day ─────────────────
     enable_ot = cint(getattr(device, "enable_overtime_punches", 1))
@@ -364,7 +407,8 @@ def sync_device(device_name, triggered_by="Manual", user=None):
                            _("Creating Employee Checkins: {0} of {1}").format(idx, total_to_process),
                            extra={"new_records": new_records, "duplicates": duplicates,
                                   "failed": failed, "overtime_records": overtime_records,
-                                  "double_punches": double_punches})
+                                  "double_punches": double_punches},
+                           run_id=run_id)
 
     sync_end    = now_datetime()
     sync_status = "Success" if failed == 0 else ("Partial" if new_records > 0 else "Failed")
@@ -390,7 +434,7 @@ def sync_device(device_name, triggered_by="Manual", user=None):
         "errors": errors[:20],
     }
     _emit_progress(device_name, user, "done", total_to_process, total_to_process,
-                   _("Sync completed."), extra=result)
+                   _("Sync completed."), extra=result, run_id=run_id)
     return result
 
 

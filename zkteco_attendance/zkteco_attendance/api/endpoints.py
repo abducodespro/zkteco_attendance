@@ -18,15 +18,21 @@ def test_connection(device_name):
 
 
 @frappe.whitelist()
-def pull_checkins_now(device_name):
+def pull_checkins_now(device_name, run_id=None):
     """
     Run a Pull Checkins sync IN THE FOREGROUND (synchronous) so the Biometric
-    Device form can show live progress (via realtime events) and then display
-    the final results immediately, without needing to check Attendance Sync
-    Log separately.
+    Device form can show live progress and then display the final results
+    immediately, without needing to check Attendance Sync Log separately.
 
-    Realtime progress events are published on "zkteco_pull_progress" while
-    this runs. The final return value also contains the full result summary.
+    Progress is reported two ways while this runs:
+    - realtime events on "zkteco_pull_progress" (fast path when the browser's
+      websocket is connected), and
+    - a per-run cached snapshot readable via get_pull_progress (polling
+      fallback when realtime is unavailable).
+
+    run_id is a client-generated token for this pull; it is echoed in every
+    progress payload so the client can ignore stale progress from other runs.
+    The final return value also contains the full result summary.
     """
     frappe.only_for(["System Manager", "HR Manager", "Biometric Device Manager"])
 
@@ -36,8 +42,27 @@ def pull_checkins_now(device_name):
 
     from zkteco_attendance.zkteco_attendance.sync_engine import sync_device
 
-    result = sync_device(device_name, triggered_by="Manual", user=frappe.session.user)
+    result = sync_device(device_name, triggered_by="Manual", user=frappe.session.user,
+                         run_id=run_id)
     return result
+
+
+@frappe.whitelist()
+def get_pull_progress(device_name, run_id=None):
+    """
+    Return the latest cached progress payload for a foreground Pull Checkins
+    run of this device by the current user (or None).
+
+    Used by the Biometric Device form as a polling fallback so live progress
+    still displays when realtime/websocket events don't reach the browser.
+    Pass the same run_id the pull was started with so stale progress from an
+    older run is ignored.
+    """
+    frappe.only_for(["System Manager", "HR Manager", "Biometric Device Manager"])
+
+    from zkteco_attendance.zkteco_attendance.sync_engine import get_live_progress
+
+    return get_live_progress(device_name, user=frappe.session.user, run_id=run_id)
 
 
 @frappe.whitelist()
@@ -209,6 +234,42 @@ def save_manual_checkin(attendance_summary=None, employee=None, checkin_time=Non
         checkin_name=checkin_name,
         is_overtime=is_overtime,
     )
+
+
+@frappe.whitelist()
+def create_manual_checkin_request(employee=None, checkin_date=None, checkin_time=None,
+                                  log_type="IN", is_overtime=0, attendance_summary=None,
+                                  checkin_name=None, remarks=None):
+    """
+    Create a Manual Checkin Request (Draft) from the Daily Checkins page or
+    the Attendance Summary "Add Check-in" button.
+
+    The Employee Checkin is NOT touched here — it is only created or updated
+    when the request document is submitted (see ManualCheckinRequest.on_submit).
+    """
+    frappe.only_for(["System Manager", "HR Manager", "Biometric Device Manager",
+                    "Checkin Editor"])
+
+    if not employee or not checkin_date or not checkin_time:
+        frappe.throw(_("Employee, Check-in Date, and Check-in Time are required."))
+    if log_type not in ("IN", "OUT"):
+        frappe.throw(_("Log Type must be IN or OUT."))
+
+    doc = frappe.get_doc({
+        "doctype": "Manual Checkin Request",
+        "employee": employee,
+        "checkin_date": checkin_date,
+        "checkin_time": checkin_time,
+        "log_type": log_type,
+        "is_overtime": 1 if is_overtime else 0,
+        "attendance_summary": attendance_summary or None,
+        "checkin_name": checkin_name or None,
+        "request_remarks": remarks,
+    })
+    doc.insert(ignore_permissions=True)
+    frappe.db.commit()
+
+    return {"name": doc.name, "action": "created", "status": "Draft"}
 
 
 @frappe.whitelist()

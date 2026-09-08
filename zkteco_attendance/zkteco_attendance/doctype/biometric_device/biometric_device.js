@@ -95,6 +95,10 @@ frappe.ui.form.on("Biometric Device", {
     },
 
     _run_pull_checkins(frm) {
+        // Unique token for this pull run — echoed back in every progress
+        // payload so stale progress from a previous run is never applied.
+        const run_id = "zk_pull_" + Date.now() + "_" + Math.random().toString(36).slice(2, 10);
+
         // ── Build a progress dialog ────────────────────────────────────────
         const dialog = new frappe.ui.Dialog({
             title: __("Pulling Check-ins from {0}", [frm.doc.device_name]),
@@ -158,6 +162,8 @@ frappe.ui.form.on("Biometric Device", {
         // ── Subscribe to realtime progress events ─────────────────────────
         const handler = (data) => {
             if (!data || data.device !== frm.doc.name) return;
+            // Ignore progress belonging to a different pull run.
+            if (data.run_id && data.run_id !== run_id) return;
 
             switch (data.stage) {
                 case "connecting":
@@ -205,7 +211,55 @@ frappe.ui.form.on("Biometric Device", {
             }
         };
 
-        frappe.realtime.on("zkteco_pull_progress", handler);
+        // ── Subscribe to realtime progress events (fast path) ─────────────
+        // Frappe delivers these over websocket/socket.io. When realtime is
+        // unavailable (socket.io not running, proxy blocking websockets,
+        // etc.) the events never reach the browser, so we ALSO poll the
+        // server-side progress snapshot below as a fallback.
+        let realtime_on = false;
+        try {
+            if (frappe.realtime && typeof frappe.realtime.on === "function") {
+                frappe.realtime.on("zkteco_pull_progress", handler);
+                realtime_on = true;
+            }
+        } catch (e) {
+            realtime_on = false;
+        }
+
+        // ── Poll fallback for progress (works without realtime) ──────────
+        let poll_timer = null;
+        const stopPolling = () => {
+            if (poll_timer) {
+                clearInterval(poll_timer);
+                poll_timer = null;
+            }
+        };
+        const poll = () => {
+            // If the dialog was dismissed while the pull is still running,
+            // stop polling (the request callback will still clean up).
+            if (!dialog.$wrapper.is(":visible")) {
+                stopPolling();
+                return;
+            }
+            frappe.call({
+                method: "zkteco_attendance.zkteco_attendance.api.endpoints.get_pull_progress",
+                args: { device_name: frm.doc.name, run_id: run_id },
+                callback(r) {
+                    if (r && r.message) handler(r.message);
+                },
+            });
+        };
+        poll_timer = setInterval(poll, 1500);
+        poll();  // poll immediately so the first stage shows without waiting
+
+        const cleanup = () => {
+            stopPolling();
+            if (realtime_on) {
+                try {
+                    frappe.realtime.off("zkteco_pull_progress", handler);
+                } catch (e) { /* ignore */ }
+            }
+        };
 
         // ── Run the synchronous pull ───────────────────────────────────────
         // Note: for devices with very large numbers of stored logs, ensure
@@ -215,9 +269,9 @@ frappe.ui.form.on("Biometric Device", {
         // realtime events.
         frm.call({
             method: "zkteco_attendance.zkteco_attendance.api.endpoints.pull_checkins_now",
-            args: { device_name: frm.doc.name },
+            args: { device_name: frm.doc.name, run_id: run_id },
             callback(r) {
-                frappe.realtime.off("zkteco_pull_progress", handler);
+                cleanup();
 
                 if (!r.message) {
                     setProgress(100, __("No response from server."));
@@ -268,7 +322,7 @@ frappe.ui.form.on("Biometric Device", {
                 frm.reload_doc();
             },
             error() {
-                frappe.realtime.off("zkteco_pull_progress", handler);
+                cleanup();
                 setProgress(100, __("Pull failed."));
                 $stage.removeClass("text-muted").addClass("text-danger");
                 dialog.get_close_btn().show();

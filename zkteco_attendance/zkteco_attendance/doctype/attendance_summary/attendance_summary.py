@@ -89,10 +89,11 @@ class AttendanceSummary(Document):
 
 
 def _process_background(summary_name):
-    """Background job: calculate attendance for all employees in the summary."""
+    """Background job: calculate attendance for all employees in the summary.
+    Employees with do_not_process checked are skipped."""
     doc = frappe.get_doc("Attendance Summary", summary_name)
 
-    employee_list = [row.employee for row in doc.details]
+    employee_list = [row.employee for row in doc.details if not row.do_not_process]
 
     checkins_by_employee = fetch_checkins(employee_list, doc.from_date, doc.to_date)
 
@@ -101,6 +102,24 @@ def _process_background(summary_name):
     default_shift      = doc.shift_type
 
     for row in doc.details:
+        if row.do_not_process:
+            # Reset computed fields so reprocessing doesn't leave stale data
+            row.working_days        = 0
+            row.absent_days         = 0
+            row.half_days           = 0
+            row.total_working_hours = 0
+            row.absent_hours        = 0
+            row.overtime_hours      = 0
+            row.day_ot_hours        = 0
+            row.night_ot_hours      = 0
+            row.weekend_ot_hours    = 0
+            row.holiday_ot_hours    = 0
+            row.overtime_days       = 0
+            row.invalid_days        = 0
+            row.manual_review_days  = 0
+            row.remarks             = ""
+            continue
+
         emp_checkins = checkins_by_employee.get(row.employee, [])
         result = process_employee(
             employee=row.employee,
@@ -127,14 +146,16 @@ def _process_background(summary_name):
         if result["remarks"]:
             row.remarks = result["remarks"]
 
+    processed_rows = [r for r in doc.details if not r.do_not_process]
+
     doc.status             = "Completed"
-    doc.total_employees    = len(doc.details)
+    doc.total_employees    = len(processed_rows)
     doc.total_working_days = count_working_days(doc.from_date, doc.to_date)
-    doc.total_overtime_hours   = round(sum(flt(r.overtime_hours) for r in doc.details), 2)
-    doc.total_day_ot_hours     = round(sum(flt(r.day_ot_hours) for r in doc.details), 2)
-    doc.total_night_ot_hours   = round(sum(flt(r.night_ot_hours) for r in doc.details), 2)
-    doc.total_weekend_ot_hours = round(sum(flt(r.weekend_ot_hours) for r in doc.details), 2)
-    doc.total_holiday_ot_hours = round(sum(flt(r.holiday_ot_hours) for r in doc.details), 2)
+    doc.total_overtime_hours   = round(sum(flt(r.overtime_hours) for r in processed_rows), 2)
+    doc.total_day_ot_hours     = round(sum(flt(r.day_ot_hours) for r in processed_rows), 2)
+    doc.total_night_ot_hours   = round(sum(flt(r.night_ot_hours) for r in processed_rows), 2)
+    doc.total_weekend_ot_hours = round(sum(flt(r.weekend_ot_hours) for r in processed_rows), 2)
+    doc.total_holiday_ot_hours = round(sum(flt(r.holiday_ot_hours) for r in processed_rows), 2)
     doc.save(ignore_permissions=True)
     frappe.db.commit()
 

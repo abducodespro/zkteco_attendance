@@ -11,6 +11,7 @@
         "zk_biometric_device",
         "attendance_device_id",
         "column_break_1",
+        "do_not_process",
         "working_days",
         "absent_days",
         "half_days",
@@ -86,6 +87,13 @@
         {
             "fieldname": "column_break_1",
             "fieldtype": "Column Break"
+        },
+        {
+            "fieldname": "do_not_process",
+            "fieldtype": "Check",
+            "label": "Do Not Process",
+            "in_list_view": 1,
+            "columns": 1
         },
         {
             "fieldname": "working_days",

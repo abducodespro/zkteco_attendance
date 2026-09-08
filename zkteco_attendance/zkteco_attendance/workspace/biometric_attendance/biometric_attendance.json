@@ -19,7 +19,7 @@
    "hidden": 0,
    "is_query_report": 0,
    "label": "Attendace &amp; Payroll",
-   "link_count": 3,
+   "link_count": 4,
    "onboard": 0,
    "type": "Card Break"
   },
@@ -29,6 +29,16 @@
    "label": "Attendance Summary",
    "link_count": 0,
    "link_to": "Attendance Summary",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Manual Checkin Request",
+   "link_count": 0,
+   "link_to": "Manual Checkin Request",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"

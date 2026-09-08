@@ -1143,7 +1143,7 @@ def get_daily_checkins_data(attendance_summary=None, from_date=None, to_date=Non
     # `full_name` only exists on Employee in newer HRMS versions; fall back to
     # employee_name otherwise so the Daily Checkins page header always gets
     # the employee's display name under `fullname`.
-    has_full_name_col = bool(employee_list) and has_column("Employee", "full_name")
+    has_full_name_col = bool(employee_list) and has_column("Employee", "fullname")
     emp_info = {}
     if employee_list:
         emp_filters = {"name": ["in", employee_list]}
@@ -1153,7 +1153,7 @@ def get_daily_checkins_data(attendance_summary=None, from_date=None, to_date=Non
                       "designation", "zk_biometric_device",
                       "attendance_device_id"]
         if has_full_name_col:
-            emp_fields.append("full_name")
+            emp_fields.append("fullname")
         rows = frappe.get_all("Employee",
                               filters=emp_filters,
                               fields=emp_fields)
@@ -1180,7 +1180,7 @@ def get_daily_checkins_data(attendance_summary=None, from_date=None, to_date=Non
             zk_device = info.get("zk_biometric_device") or ""
             att_dev_id = info.get("attendance_device_id") or ""
 
-        fullname = (info.get("full_name") or "").strip() or emp_name
+        fullname = (info.get("fullname") or "").strip() or emp_name
 
         days = get_employee_daily_breakdown(
             employee=emp_id,

@@ -43,6 +43,14 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
                     <button class="btn btn-primary btn-sm" id="zk-load-btn">${__("Load")}</button>
                     &nbsp;
                     <button class="btn btn-default btn-sm" id="zk-clear-btn">${__("Clear")}</button>
+                    <span style="flex:1;"></span>
+                    <button class="btn btn-default btn-sm" id="zk-pdf-btn" title="${__("Download the loaded report as a PDF")}" disabled>
+                        <i class="fa fa-file-pdf-o" style="color:var(--red-500);"></i> ${__("Download PDF")}
+                    </button>
+                    &nbsp;
+                    <button class="btn btn-default btn-sm" id="zk-excel-btn" title="${__("Download the loaded report as an Excel workbook")}" disabled>
+                        <i class="fa fa-file-excel-o" style="color:var(--green-500);"></i> ${__("Download Excel")}
+                    </button>
                 </div>
             </div>
         </div>
@@ -173,7 +181,7 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
         );
     });
 
-    // ── Load / Clear buttons ──────────────────────────────────────────────
+    // ── Load / Clear / Download PDF buttons ────────────────────────────────
     $filterWrap.find("#zk-load-btn").on("click", () => trigger_load());
     $filterWrap.find("#zk-clear-btn").on("click", () => {
         from_ctrl.set_value("");
@@ -189,11 +197,72 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
         render_empty_state();
     });
 
+    // Download PDF — server re-runs the same query as Load and streams a
+    // styled PDF back. Navigate to the API URL so the browser saves the file.
+    $filterWrap.find("#zk-pdf-btn").on("click", function () {
+        const fd = from_ctrl.get_value();
+        const td = to_ctrl.get_value();
+        if (!fd || !td) {
+            frappe.msgprint(__("Please set both From Date and To Date."));
+            return;
+        }
+        if (!state.data || !state.data.employees || !state.data.employees.length) {
+            frappe.msgprint(__("Load data first — there is nothing to download yet."));
+            return;
+        }
+        const payload = {
+            from_date:          fd,
+            to_date:            td,
+            attendance_summary: state.attendance_summary || "",
+            employee_list:      state.employee_list.length ? JSON.stringify(state.employee_list) : "",
+            biometric_device:   state.biometric_device || "",
+            filter_employee:    state.filter_employee || "",
+        };
+        const query = Object.keys(payload)
+            .filter(k => payload[k])
+            .map(k => encodeURIComponent(k) + "=" + encodeURIComponent(payload[k]))
+            .join("&");
+        const url = "/api/method/zkteco_attendance.zkteco_attendance.page.zk_daily_checkins.zk_daily_checkins.download_pdf?" + query;
+        frappe.show_alert({ message: __("Preparing PDF download…"), indicator: "blue" }, 4);
+        window.location.href = url;
+    });
+
+    // Download Excel — same query as Load/PDF; server streams back an .xlsx.
+    $filterWrap.find("#zk-excel-btn").on("click", function () {
+        const fd = from_ctrl.get_value();
+        const td = to_ctrl.get_value();
+        if (!fd || !td) {
+            frappe.msgprint(__("Please set both From Date and To Date."));
+            return;
+        }
+        if (!state.data || !state.data.employees || !state.data.employees.length) {
+            frappe.msgprint(__("Load data first — there is nothing to download yet."));
+            return;
+        }
+        const payload = {
+            from_date:          fd,
+            to_date:            td,
+            attendance_summary: state.attendance_summary || "",
+            employee_list:      state.employee_list.length ? JSON.stringify(state.employee_list) : "",
+            biometric_device:   state.biometric_device || "",
+            filter_employee:    state.filter_employee || "",
+        };
+        const query = Object.keys(payload)
+            .filter(k => payload[k])
+            .map(k => encodeURIComponent(k) + "=" + encodeURIComponent(payload[k]))
+            .join("&");
+        const url = "/api/method/zkteco_attendance.zkteco_attendance.page.zk_daily_checkins.zk_daily_checkins.download_excel?" + query;
+        frappe.show_alert({ message: __("Preparing Excel download…"), indicator: "blue" }, 4);
+        window.location.href = url;
+    });
+
     // ── Helpers ───────────────────────────────────────────────────────────
     function render_empty_state(msg) {
         $body.html(`<div class="text-muted text-center" style="padding:60px 0;">
             ${msg || __("Set a date range and click Load to view daily check-ins.")}
         </div>`);
+        $filterWrap.find("#zk-pdf-btn").prop("disabled", true);
+        $filterWrap.find("#zk-excel-btn").prop("disabled", true);
     }
 
     function status_color(status) {
@@ -287,6 +356,14 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
         return chips + add_btn(false);
     }
 
+    // Convert decimal hours (7.6) to clock-style H:MM (7:36)
+    function format_hours_hhmm(hours) {
+        const totalMinutes = Math.max(0, Math.round((hours || 0) * 60));
+        const hh = Math.floor(totalMinutes / 60);
+        const mm = String(totalMinutes % 60).padStart(2, "0");
+        return `${hh}:${mm}`;
+    }
+
     function render_employee_table(emp, summary_name) {
         const rows = emp.days.map(d => {
             const dayMark = d.is_holiday
@@ -302,6 +379,7 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
                     <td style="border: 1px solid #385068;">${__(d.weekday)}</td>
                     <td style="border: 1px solid #385068;"><span class="indicator-pill ${status_color(d.status)}">${__(d.status)}</span><br>${grace_badges(d)}</td>
                     <td class="text-right" style="border: 1px solid #385068;">${(d.hours||0).toFixed(2)}</td>
+                    <td class="text-right" style="border: 1px solid #385068;">${format_hours_hhmm(d.hours)}</td>
                     <td class="text-right ${d.overtime_hours ? 'text-warning' : ''}" style="border: 1px solid #385068;">${ot_cell(d)}</td>
                     <td style="border: 1px solid #385068;">${render_checkin_chips(d.checkins, emp.employee, d.date, summary_name)}</td>
                 </tr>`;
@@ -315,6 +393,7 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
                         <th style="width:90px; border: 1px solid #385068; background-color: #8bc2f8;">${__("Day")}</th>
                         <th style="width:120px; border: 1px solid #385068; background-color: #8bc2f8;">${__("Status")}</th>
                         <th style="width:70px; border: 1px solid #385068; background-color: #8bc2f8;" class="text-right">${__("Hours")}</th>
+                        <th style="width:90px; border: 1px solid #385068; background-color: #8bc2f8;" class="text-right">${__("Formatted Hours")}</th>
                         <th style="width:160px; border: 1px solid #385068; background-color: #8bc2f8;" class="text-right">${__("OT Breakdown")}</th>
                         <th style="border: 1px solid #385068; background-color: #8bc2f8;">${__("Check-ins")}</th>
                     </tr>
@@ -412,6 +491,10 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
                 $ic.removeClass("fa-chevron-down").addClass("fa-chevron-up");
             }
         });
+
+        // A report is on screen — the PDF / Excel downloads are now available
+        $filterWrap.find("#zk-pdf-btn").prop("disabled", false);
+        $filterWrap.find("#zk-excel-btn").prop("disabled", false);
     }
 
     // ── Manual checkin dialog ─────────────────────────────────────────────
@@ -564,35 +647,36 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
                 { fieldtype: "Check", fieldname: "is_overtime", label: __("Is Overtime"),
                   default: isOT, description: __("Mark this punch as an overtime punch") },
             ],
-            primary_action_label: mode === "edit" ? __("Update") : __("Save"),
+            primary_action_label: mode === "edit" ? __("Create Request") : __("Create Request"),
             primary_action(vals) {
                 if (!vals.checkin_date || !vals.checkin_time) {
                     frappe.msgprint(__("Date and Time are required."));
                     return;
                 }
-                const checkin_time = vals.checkin_date + " " + vals.checkin_time;
+                // Create a Manual Checkin Request instead of touching the
+                // checkin directly — the checkin is applied when the request
+                // document is submitted.
                 frappe.call({
-                    method: "zkteco_attendance.zkteco_attendance.page.zk_daily_checkins.zk_daily_checkins.save_manual_checkin",
+                    method: "zkteco_attendance.zkteco_attendance.page.zk_daily_checkins.zk_daily_checkins.create_manual_checkin_request",
                     args: {
                         attendance_summary: summary || null,
                         employee:           vals.employee,
-                        checkin_time,
+                        checkin_date:       vals.checkin_date,
+                        checkin_time:       vals.checkin_time,
                         log_type:           vals.log_type,
                         checkin_name:       checkin_name || null,
                         is_overtime:        vals.is_overtime ? 1 : 0,
                     },
                     freeze: true,
-                    freeze_message: __("Saving…"),
+                    freeze_message: __("Creating request…"),
                     callback(r) {
                         d.hide();
-                        if (r.message) {
+                        if (r.message && r.message.name) {
                             frappe.show_alert({
-                                message: r.message.action === "created"
-                                    ? __("Check-in added successfully.")
-                                    : __("Check-in updated successfully."),
-                                indicator: "green",
-                            }, 4);
-                            trigger_load();
+                                message: __("Manual Check-in Request {0} created. Submit it to apply the check-in.", [r.message.name]),
+                                indicator: "blue",
+                            }, 6);
+                            frappe.set_route("Form", "Manual Checkin Request", r.message.name);
                         }
                     },
                 });
@@ -615,6 +699,8 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
             return;
         }
 
+        $filterWrap.find("#zk-pdf-btn").prop("disabled", true);
+        $filterWrap.find("#zk-excel-btn").prop("disabled", true);
         $body.html(`<div class="text-muted text-center" style="padding:40px 0;">${__("Loading…")}</div>`);
 
         frappe.call({

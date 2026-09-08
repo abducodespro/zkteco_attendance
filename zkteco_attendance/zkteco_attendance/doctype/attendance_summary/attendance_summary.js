@@ -22,9 +22,10 @@ frappe.ui.form.on("Attendance Summary", {
         if (frm.doc.details && frm.doc.details.length > 0) {
             // ── Process Attendance ───────────────────────────────────────
             frm.add_custom_button(__("Process Attendance"), function () {
+                const processable = (frm.doc.details || []).filter(r => !r.do_not_process).length;
                 frappe.confirm(
                     __("Process attendance for <b>{0}</b> employees from <b>{1}</b> to <b>{2}</b>? This will also calculate overtime where enabled on the shift.",
-                        [frm.doc.details.length,
+                        [processable,
                         frappe.datetime.str_to_user(frm.doc.from_date),
                         frappe.datetime.str_to_user(frm.doc.to_date)]),
                     function () {
@@ -300,32 +301,35 @@ frappe.ui.form.on("Attendance Summary", {
                     description: __("Mark this punch as an overtime punch"),
                 },
             ],
-            primary_action_label: __("Save Check-in"),
+            primary_action_label: __("Create Request"),
             primary_action(vals) {
                 if (!vals.employee || !vals.checkin_date || !vals.checkin_time) {
                     frappe.msgprint(__("All fields are required."));
                     return;
                 }
-                const checkin_time = vals.checkin_date + " " + vals.checkin_time;
-                frm.call({
-                    doc: frm.doc,
-                    method: "save_manual_checkin",
+                // Create a Manual Checkin Request instead of touching the
+                // checkin directly — the checkin is applied when the request
+                // document is submitted.
+                frappe.call({
+                    method: "zkteco_attendance.zkteco_attendance.api.endpoints.create_manual_checkin_request",
                     args: {
-                        employee:     vals.employee,
-                        checkin_time: checkin_time,
-                        log_type:     vals.log_type,
-                        is_overtime:  vals.is_overtime ? 1 : 0,
+                        employee:           vals.employee,
+                        checkin_date:       vals.checkin_date,
+                        checkin_time:       vals.checkin_time,
+                        log_type:           vals.log_type,
+                        is_overtime:        vals.is_overtime ? 1 : 0,
+                        attendance_summary: frm.doc.name,
                     },
                     freeze: true,
-                    freeze_message: __("Saving check-in…"),
+                    freeze_message: __("Creating request…"),
                     callback(r) {
                         d.hide();
-                        if (r.message) {
+                        if (r.message && r.message.name) {
                             frappe.show_alert({
-                                message: __("Check-in {0} for {1} at {2}.",
-                                    [r.message.action, vals.employee, checkin_time]),
-                                indicator: "green",
+                                message: __("Manual Check-in Request {0} created. Submit it to apply the check-in.", [r.message.name]),
+                                indicator: "blue",
                             }, 6);
+                            frappe.set_route("Form", "Manual Checkin Request", r.message.name);
                         }
                     },
                 });
@@ -401,14 +405,18 @@ frappe.ui.form.on("Attendance Summary", {
                         const existing = new Set((frm.doc.details || []).map(row => row.employee));
                         let added = 0;
 
+                        const working_days = frappe.datetime.get_diff(frm.doc.to_date, frm.doc.from_date) + 1;
+
                         emps.forEach(emp => {
                             // is zk_biometric_device and attendance_device_id are empty
-                            if (!existing.has(emp.name) && emp.zk_biometric_device && emp.attendance_device_id) {
+                            if (!existing.has(emp.name)) {
                                 frm.add_child("details", {
                                     employee: emp.name,
                                     employee_name: emp.employee_name,
                                     department: emp.department,
                                     designation: emp.designation,
+                                    do_not_process: emp.zk_biometric_device && emp.attendance_device_id ? 0 : 1,
+                                    working_days: emp.zk_biometric_device && emp.attendance_device_id ? working_days : 0,
                                 });
                                 existing.add(emp.name);
                                 added++;
