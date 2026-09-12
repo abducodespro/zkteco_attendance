@@ -234,6 +234,7 @@
             "fieldname": "standard_start_time",
             "fieldtype": "Time",
             "label": "Standard Shift Core Start",
+            "default": "06:00:00",
             "depends_on": "eval:doc.enable_overtime",
             "description": "The time when standard (non-OT) hours begin. Hours worked before this time on a day shift count as Day OT."
         },

@@ -16,7 +16,7 @@
   {"fieldname":"year","fieldtype":"Data","label":"Year","read_only":1,"in_list_view":1},
   {"fieldname":"column_break_1","fieldtype":"Column Break"},
   {"fieldname":"company","fieldtype":"Link","label":"Company","options":"Company","reqd":1,"in_list_view":1},
-  {"fieldname":"project","fieldtype":"Link","label":"Project","options":"Project","reqd":1,"in_list_view":1},
+  {"fieldname":"project","fieldtype":"Link","label":"Project","options":"Project","in_list_view":1},
   {"fieldname":"status","fieldtype":"Select","label":"Status","options":"Draft\nProcessing\nCompleted","default":"Draft","in_list_view":1,"read_only":1},
   {"fieldname":"section_settings","fieldtype":"Section Break","label":"Processing Settings"},
   {"fieldname":"shift_type","fieldtype":"Link","label":"Default Shift Type","options":"ZK Shift Type","description":"Fallback shift used when employee has no assignment"},

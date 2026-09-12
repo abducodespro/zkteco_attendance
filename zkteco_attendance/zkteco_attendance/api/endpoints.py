@@ -239,7 +239,7 @@ def save_manual_checkin(attendance_summary=None, employee=None, checkin_time=Non
 @frappe.whitelist()
 def create_manual_checkin_request(employee=None, checkin_date=None, checkin_time=None,
                                   log_type="IN", is_overtime=0, attendance_summary=None,
-                                  checkin_name=None, remarks=None):
+                                  checkin_name=None, remarks=None, request_type="New"):
     """
     Create a Manual Checkin Request (Draft) from the Daily Checkins page or
     the Attendance Summary "Add Check-in" button.
@@ -254,6 +254,10 @@ def create_manual_checkin_request(employee=None, checkin_date=None, checkin_time
         frappe.throw(_("Employee, Check-in Date, and Check-in Time are required."))
     if log_type not in ("IN", "OUT"):
         frappe.throw(_("Log Type must be IN or OUT."))
+    if request_type not in ("New", "Edit"):
+        frappe.throw(_("Request Type must be New or Edit."))
+    if request_type == "Edit" and not checkin_name:
+        frappe.throw(_("An Existing Check-in must be set when Request Type is Edit."))
 
     doc = frappe.get_doc({
         "doctype": "Manual Checkin Request",
@@ -261,10 +265,11 @@ def create_manual_checkin_request(employee=None, checkin_date=None, checkin_time
         "checkin_date": checkin_date,
         "checkin_time": checkin_time,
         "log_type": log_type,
-        "is_overtime": 1 if is_overtime else 0,
+        "is_overtime": cint(is_overtime),
         "attendance_summary": attendance_summary or None,
         "checkin_name": checkin_name or None,
         "request_remarks": remarks,
+        "request_type": request_type,
     })
     doc.insert(ignore_permissions=True)
     frappe.db.commit()

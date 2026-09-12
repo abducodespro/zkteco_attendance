@@ -15,6 +15,16 @@ from frappe.model.document import Document
 class ManualCheckinRequest(Document):
 
     def validate(self):
+        # Request Type is required: "New" adds a check-in, "Edit" modifies
+        # the existing check-in referenced by `checkin_name`.
+        if not self.request_type:
+            self.request_type = "New"
+        if self.request_type not in ("New", "Edit"):
+            frappe.throw(_("Request Type must be New or Edit."))
+
+        if self.request_type == "Edit" and not self.checkin_name:
+            frappe.throw(_("An Existing Check-in must be set when Request Type is Edit."))
+
         # Keep the request tied to a real summary: the employee must be part
         # of it (mirrors AttendanceSummary.save_manual_checkin).
         if self.attendance_summary:
@@ -40,7 +50,8 @@ class ManualCheckinRequest(Document):
 
         # Only update the referenced check-in if it still exists
         existing_name = None
-        if self.checkin_name and frappe.db.exists("Employee Checkin", self.checkin_name):
+        if self.request_type == "Edit" and self.checkin_name \
+                and frappe.db.exists("Employee Checkin", self.checkin_name):
             existing_name = self.checkin_name
 
         result = save_manual_checkin_record(

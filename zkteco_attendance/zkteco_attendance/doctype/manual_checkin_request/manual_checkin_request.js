@@ -1,6 +1,13 @@
 // Manual Checkin Request Form JS
 frappe.ui.form.on("Manual Checkin Request", {
 
+    request_type(frm) {
+        // A "New" request must not reference an existing check-in
+        if (frm.doc.request_type === "New" && frm.doc.checkin_name) {
+            frm.set_value("checkin_name", "");
+        }
+    },
+
     refresh(frm) {
         if (frm.doc.docstatus === 0) {
             frm.dashboard.add_comment(

@@ -12,6 +12,7 @@ class ZKShiftAssignment(Document):
 
     def _check_duplicate_assignments(self):
         """Warn if any employee already has an active assignment overlapping this period."""
+        dublicates = []
         for row in self.employees:
             if not row.employee:
                 continue
@@ -27,11 +28,14 @@ class ZKShiftAssignment(Document):
             """, (row.employee, self.name or "NEW", self.to_date, self.from_date), as_dict=True)
 
             if conflict:
-                frappe.msgprint(
-                    _("Employee {0} already has an active shift assignment ({1}) overlapping this period.").format(
-                        row.employee, conflict[0].name
-                    ),
-                    alert=True, indicator="orange"
+                dublicates.append((row.employee, conflict[0].name))
+
+        if dublicates:
+            frappe.throw(
+                _("The following employees already have active shift assignments overlapping this period: {0}").format(
+                    ", ".join([f"{emp} ({shift})" for emp, shift in dublicates])
+                ),
+                alert=True, indicator="orange"
                 )
 
 

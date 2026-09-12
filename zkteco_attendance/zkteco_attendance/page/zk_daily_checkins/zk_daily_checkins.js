@@ -24,7 +24,7 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
 
     // ── Filter bar ────────────────────────────────────────────────────────
     const $filterWrap = $(`
-        <div class="zk-daily-filterbar" style="padding:14px 0 0 0;">
+        <div class="zk-daily-filterbar" style="padding:14px;">
             <div class="row" style="margin-bottom:8px;">
                 <div class="col-sm-2" id="zk-fd"></div>
                 <div class="col-sm-2" id="zk-td"></div>
@@ -43,6 +43,10 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
                     <button class="btn btn-primary btn-sm" id="zk-load-btn">${__("Load")}</button>
                     &nbsp;
                     <button class="btn btn-default btn-sm" id="zk-clear-btn">${__("Clear")}</button>
+                    &nbsp;
+                    <button class="btn btn-default btn-sm" id="zk-invalids-btn" title="${__("Show employees with invalid attendance days in the selected range")}">
+                        <i class="fa fa-exclamation-triangle" style="color:var(--orange-500);"></i> ${__("Check invalids")}
+                    </button>
                     <span style="flex:1;"></span>
                     <button class="btn btn-default btn-sm" id="zk-pdf-btn" title="${__("Download the loaded report as a PDF")}" disabled>
                         <i class="fa fa-file-pdf-o" style="color:var(--red-500);"></i> ${__("Download PDF")}
@@ -127,7 +131,7 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
     });
     emp_ctrl.refresh();
 
-    const $body = $(`<div class="zk-daily-body" style="margin-top:18px;"></div>`).appendTo(page.main);
+    const $body = $(`<div class="zk-daily-body" style="margin:18px;"></div>`).appendTo(page.main);
 
     // ── Delegated handlers (bound ONCE — $body persists across renders) ──
     // These must NOT be re-bound inside render_data(), otherwise each Load
@@ -255,6 +259,94 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
         frappe.show_alert({ message: __("Preparing Excel download…"), indicator: "blue" }, 4);
         window.location.href = url;
     });
+
+    // Check invalids — popup listing employees with invalid days + the dates
+    $filterWrap.find("#zk-invalids-btn").on("click", function () {
+        const fd = from_ctrl.get_value();
+        const td = to_ctrl.get_value();
+        if (!fd || !td) {
+            frappe.msgprint(__("Please set both From Date and To Date."));
+            return;
+        }
+
+        frappe.call({
+            method: "zkteco_attendance.zkteco_attendance.page.zk_daily_checkins.zk_daily_checkins.get_invalid_days",
+            args: {
+                attendance_summary: state.attendance_summary || null,
+                from_date:          fd,
+                to_date:            td,
+                employee_list:      state.employee_list.length ? JSON.stringify(state.employee_list) : null,
+                biometric_device:   state.biometric_device || null,
+                filter_employee:    state.filter_employee || null,
+            },
+            freeze: true,
+            freeze_message: __("Checking invalid days…"),
+            callback(r) {
+                show_invalids_dialog(r.message || {});
+            },
+        });
+    });
+
+    function show_invalids_dialog(payload) {
+        const invalids  = payload.invalids || [];
+        const fromDate  = payload.from_date ? frappe.datetime.str_to_user(payload.from_date) : "";
+        const toDate    = payload.to_date   ? frappe.datetime.str_to_user(payload.to_date)   : "";
+        const periodTxt = fromDate && toDate && fromDate !== toDate ? `${fromDate} — ${toDate}` : (fromDate || "");
+
+        if (!invalids.length) {
+            frappe.msgprint({
+                title: __("Check Invalids"),
+                message: periodTxt
+                    ? __("No invalid days found for {0}.", [periodTxt])
+                    : __("No invalid days found."),
+                indicator: "green",
+            });
+            return;
+        }
+
+        const rows = invalids.map(inv => `
+            <tr>
+                <td style="border:1px solid var(--border-color);padding:6px 10px;">
+                    <a href="/app/employee/${encodeURIComponent(inv.employee)}">${frappe.utils.escape_html(inv.employee_name || inv.employee)}</a>
+                    <div class="text-muted" style="font-size:0.75rem;">${frappe.utils.escape_html(inv.employee || "")}</div>
+                </td>
+                <td style="border:1px solid var(--border-color);padding:6px 10px;">${frappe.utils.escape_html(inv.department || "—")}</td>
+                <td style="border:1px solid var(--border-color);padding:6px 10px;text-align:center;">
+                    <span class="indicator-pill red">${inv.invalid_count}</span>
+                </td>
+                <td style="border:1px solid var(--border-color);padding:6px 10px;">
+                    ${(inv.invalid_dates || []).map(dt =>
+                        `<span class="zk-invalid-date" title="${__("Invalid attendance day")}" style="display:inline-block;border:1px solid #b03a3a;border-radius:4px;padding:1px 6px;margin:2px;font-size:0.75rem;background:#ffd6d6;color:#7a1010;">${frappe.datetime.str_to_user(dt)}</span>`
+                    ).join(" ")}
+                </td>
+            </tr>`).join("");
+
+        const tableHtml = `
+            <div class="text-muted" style="margin-bottom:8px;">
+                ${periodTxt ? `<b>${periodTxt}</b> &nbsp;|&nbsp;` : ""}
+                ${__("{0} employee(s) with invalid days, of {1} checked.", [invalids.length, payload.total_employees_checked || 0])}
+            </div>
+            <div style="max-height:55vh;overflow:auto;">
+                <table class="table table-bordered" style="margin-bottom:0;">
+                    <thead>
+                        <tr style="background:var(--table-bg,var(--card-bg));">
+                            <th style="width:30%;">${__("Employee")}</th>
+                            <th style="width:20%;">${__("Department")}</th>
+                            <th style="width:12%; text-align:center;">${__("Invalid Days")}</th>
+                            <th>${__("Invalid Dates")}</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>`;
+
+        const dlg = new frappe.ui.Dialog({
+            title: __("Employees with Invalid Days"),
+            size: "large",
+        });
+        dlg.$body.find(".modal-body").html(`<div style="padding:12px 15px;">${tableHtml}</div>`);
+        dlg.show();
+    }
 
     // ── Helpers ───────────────────────────────────────────────────────────
     function render_empty_state(msg) {
@@ -637,6 +729,9 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
                 { fieldtype: "Section Break", fieldname: "section_break_1" },
                 { fieldtype: "Link", fieldname: "employee", label: __("Employee"),
                   options: "Employee", default: employee, read_only: 1 },
+                { fieldtype: "Select", fieldname: "request_type", label: __("Request Type"),
+                  options: "New\nEdit", default: mode === "edit" ? "Edit" : "New", reqd: 1,
+                  description: __("Edit modifies the existing check-in; New adds one.") },
                 { fieldtype: "Date", fieldname: "checkin_date", label: __("Date"),
                   default: date, reqd: 1 },
                 { fieldtype: "Time", fieldname: "checkin_time", label: __("Time"),
@@ -661,6 +756,7 @@ frappe.pages["zk-daily-checkins"].on_page_load = function (wrapper) {
                     args: {
                         attendance_summary: summary || null,
                         employee:           vals.employee,
+                        request_type:       vals.request_type || "New",
                         checkin_date:       vals.checkin_date,
                         checkin_time:       vals.checkin_time,
                         log_type:           vals.log_type,

@@ -46,6 +46,55 @@ def toggle_ignore_checkin(checkin_name):
 
 
 @frappe.whitelist()
+def get_invalid_days(attendance_summary=None, from_date=None, to_date=None,
+                     employee_list=None, company=None, biometric_device=None,
+                     filter_employee=None):
+    """
+    Return only the employees whose daily breakdown contains "Invalid" days,
+    together with the exact invalid dates and counts.
+
+    Accepts the same arguments as `get_data`, so "Check invalids" always
+    matches the currently filtered view on the page.
+    """
+    from zkteco_attendance.zkteco_attendance.api.endpoints import get_daily_checkins
+
+    data = get_daily_checkins(
+        attendance_summary=attendance_summary,
+        from_date=from_date,
+        to_date=to_date,
+        employee_list=employee_list,
+        company=company,
+        biometric_device=biometric_device,
+        filter_employee=filter_employee,
+    )
+
+    invalids = []
+    for emp in data.get("employees") or []:
+        invalid_dates = [
+            d.get("date")
+            for d in (emp.get("days") or [])
+            if (d.get("status") or "") == "Invalid"
+        ]
+        if not invalid_dates:
+            continue
+        invalids.append({
+            "employee":      emp.get("employee"),
+            "employee_name": emp.get("fullname") or emp.get("employee_name") or emp.get("employee"),
+            "department":    emp.get("department") or "",
+            "shift_type":    emp.get("shift_type") or "",
+            "invalid_count": len(invalid_dates),
+            "invalid_dates": invalid_dates,
+        })
+
+    return {
+        "from_date": data.get("from_date"),
+        "to_date":   data.get("to_date"),
+        "invalids":  invalids,
+        "total_employees_checked": len(data.get("employees") or []),
+    }
+
+
+@frappe.whitelist()
 def get_employee_shift_info(employee, work_date=None):
     from zkteco_attendance.zkteco_attendance.api.endpoints import get_employee_shift_info
     return get_employee_shift_info(employee, work_date)
